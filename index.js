@@ -1014,4 +1014,9 @@ if (i.isUserSelectMenu() && i.customId === 'select_user_to_check') {
 });
 
 /* ================= LOGIN ================= */
-client.login(process.env.TOKEN);
+if (!process.env.DISCORD_TOKEN) {
+  console.error('❌ DISCORD_TOKEN is missing!');
+  process.exit(1);
+}
+
+client.login(process.env.DISCORD_TOKEN);
