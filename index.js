@@ -1,6 +1,5 @@
 require('dotenv').config();
-require('./duty/dutyListener')(client);
-const dutyListener = require('./duty/dutyListener');
+
 const express = require('express');
 const app = express();
 
@@ -38,6 +37,7 @@ const {
   UserSelectMenuBuilder
 } = require('discord.js');
 
+const dutyListener = require('./duty/dutyListener');
 const fs = require('fs');
 const path = require('path');
 const XLSX = require('xlsx');
@@ -67,6 +67,8 @@ const client = new Client({
     GatewayIntentBits.GuildMembers // ✅ เพิ่ม
   ]
 });
+const dutyListener = require('./duty/dutyListener');
+dutyListener(client);
 
 async function safeReply(interaction, options) {
   if (interaction.replied || interaction.deferred) {
@@ -999,7 +1001,6 @@ if (i.isUserSelectMenu() && i.customId === 'select_user_to_check') {
 
   return i.editReply({ embeds: [embed] });
 }
-dutyListener(client);
 
   } catch (err) {
     console.error('INTERACTION ERROR:', err);
