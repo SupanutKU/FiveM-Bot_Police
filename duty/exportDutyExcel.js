@@ -1,35 +1,49 @@
-const sqlite3 = require('sqlite3').verbose();
-const ExcelJS = require('exceljs');
 const path = require('path');
+const XLSX = require('xlsx');
+const sqlite3 = require('sqlite3').verbose();
 
-module.exports = async function exportDutyExcel() {
-  const dbPath = path.join(__dirname, '../duty.db');
-  const db = new sqlite3.Database(dbPath);
+module.exports = function exportDutyExcel() {
+  return new Promise((resolve, reject) => {
+    const dbPath = path.join(__dirname, 'duty.db');
+    const db = new sqlite3.Database(dbPath);
 
-  const workbook = new ExcelJS.Workbook();
-  const sheet = workbook.addWorksheet('Duty Logs');
+    db.all(
+      `SELECT officer_id, action, time FROM duty_logs ORDER BY time ASC`,
+      (err, rows) => {
+        if (err) {
+          db.close();
+          return reject(err);
+        }
 
-  sheet.columns = [
-    { header: 'ID', key: 'id', width: 10 },
-    { header: 'Steam ID', key: 'steam_id', width: 25 },
-    { header: 'UID', key: 'uid', width: 10 },
-    { header: 'Name', key: 'name', width: 20 },
-    { header: 'Action', key: 'action', width: 15 },
-    { header: 'Time', key: 'time', width: 25 },
-  ];
+        const data = rows.map((r, i) => ({
+          ลำดับ: i + 1,
+          เจ้าหน้าที่: r.officer_id,
+          สถานะ: r.action === 'IN' ? 'เข้าเวร' : 'ออกเวร',
+          เวลา: new Date(r.time).toLocaleString('th-TH')
+        }));
 
-  db.all(`SELECT * FROM duty_logs ORDER BY time ASC`, async (err, rows) => {
-    if (err) {
-      console.error('❌ DB error:', err);
-      return;
-    }
+        const wb = XLSX.utils.book_new();
+        const ws = XLSX.utils.json_to_sheet(data);
 
-    rows.forEach(row => sheet.addRow(row));
+        ws['!cols'] = [
+          { wch: 8 },
+          { wch: 20 },
+          { wch: 15 },
+          { wch: 25 }
+        ];
 
-    const fileName = `duty_export_${Date.now()}.xlsx`;
-    await workbook.xlsx.writeFile(fileName);
+        XLSX.utils.book_append_sheet(wb, ws, 'Duty Logs');
 
-    console.log(`✅ Exported Excel: ${fileName}`);
-    db.close();
+        const filePath = path.join(
+          __dirname,
+          `duty-${Date.now()}.xlsx`
+        );
+
+        XLSX.writeFile(wb, filePath);
+        db.close();
+
+        resolve(filePath);
+      }
+    );
   });
 };

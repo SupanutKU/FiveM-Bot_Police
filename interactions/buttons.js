@@ -8,6 +8,7 @@ const {
   ActionRowBuilder,
 } = require('discord.js');
 
+const exportDutyExcel = require('../duty/exportDutyExcel');
 const exportExcel = require('../utils/excelExport');
 const weeklySummary = require('../utils/weeklySummary');
 
@@ -135,10 +136,20 @@ module.exports = async (interaction) => {
   }
 
   /* ===== Export Excel ===== */
-  if (id === 'export_excel') {
-    const file = await exportExcel(cases);
-    return interaction.editReply({ files: [file] });
+ if (id === 'export_excel') {
+  try {
+    const filePath = await exportDutyExcel();
+
+    return interaction.editReply({
+      content: '📊 ส่งออก Excel จากระบบเวรเรียบร้อย',
+      files: [filePath]
+    });
+  } catch (err) {
+    console.error(err);
+    return interaction.editReply('❌ Export Excel จาก DB ไม่สำเร็จ');
   }
+}
+
 
   /* ===== Weekly Summary ===== */
   if (id === 'weekly_summary') {
