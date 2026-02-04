@@ -37,6 +37,8 @@ const {
   UserSelectMenuBuilder
 } = require('discord.js');
 
+const exportDutyExcel = require('./duty/exportDutyExcel');
+const sqlite3 = require('sqlite3').verbose();
 const fs = require('fs');
 const path = require('path');
 const XLSX = require('xlsx');
@@ -1000,6 +1002,51 @@ if (i.isUserSelectMenu() && i.customId === 'select_user_to_check') {
 
   return i.editReply({ embeds: [embed] });
 }
+/* ================= DATA ================= */
+function exportDutyExcel() {
+  return new Promise((resolve, reject) => {
+    const dbPath = path.join(__dirname, 'duty.db');
+    const db = new sqlite3.Database(dbPath);
+
+    const sql = `
+      SELECT 
+        id AS 'ID',
+        user_id AS 'User ID',
+        action AS 'Action',
+        position AS 'ตำแหน่ง',
+        datetime(timestamp, 'localtime') AS 'เวลา'
+      FROM duty_logs
+      ORDER BY timestamp ASC
+    `;
+
+    db.all(sql, [], (err, rows) => {
+      if (err) {
+        db.close();
+        return reject(err);
+      }
+
+      if (!rows.length) {
+        db.close();
+        return reject(new Error('ไม่มีข้อมูลใน duty_logs'));
+      }
+
+      const workbook = XLSX.utils.book_new();
+      const worksheet = XLSX.utils.json_to_sheet(rows);
+
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Duty Logs');
+
+      const filePath = path.join(
+        __dirname,
+        `duty_logs_${Date.now()}.xlsx`
+      );
+
+      XLSX.writeFile(workbook, filePath);
+
+      db.close();
+      resolve(filePath);
+    });
+  });
+}
 
   } catch (err) {
     console.error('INTERACTION ERROR:', err);
@@ -1015,7 +1062,9 @@ if (i.isUserSelectMenu() && i.customId === 'select_user_to_check') {
 
   }
 });
-
+exportDutyExcel()
+  .then(file => console.log('📊 Export สำเร็จ:', file))
+  .catch(err => console.error('❌ Export ล้มเหลว:', err.message));
 /* ================= LOGIN ================= */
 if (!process.env.DISCORD_TOKEN) {
   console.error('❌ DISCORD_TOKEN is missing!');
