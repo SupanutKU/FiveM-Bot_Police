@@ -61,9 +61,24 @@ const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.MessageContent
+    GatewayIntentBits.MessageContent,
+    GatewayIntentBits.GuildMembers // ✅ เพิ่ม
   ]
 });
+
+async function safeReply(interaction, options) {
+  if (interaction.replied || interaction.deferred) {
+    return interaction.followUp(options);
+  }
+  return interaction.reply(options);
+}
+
+async function safeEdit(interaction, options) {
+  if (interaction.replied) {
+    return interaction.editReply(options);
+  }
+  return interaction.reply(options);
+}
 
 /* ✅ FIX 1: INIT COMMANDS */
 client.commands = new Map();
@@ -354,26 +369,7 @@ if (i.customId === 'check_my_case') {
       .setStyle(ButtonStyle.Secondary)
   );
 
-  return i.reply({
-    content: 'กรุณาเลือกรูปแบบการเช็คเคส:',
-    components: [row],
-    ephemeral: true
-  });
-}
-if (i.customId === 'check_my_case') {
-  const row = new ActionRowBuilder().addComponents(
-    new ButtonBuilder()
-      .setCustomId('mycase_this_week')
-      .setLabel('📆 สัปดาห์นี้ (อาทิตย์ - เสาร์)')
-      .setStyle(ButtonStyle.Success),
-
-    new ButtonBuilder()
-      .setCustomId('mycase_all')
-      .setLabel('📂 เช็คทั้งหมดของตัวเอง')
-      .setStyle(ButtonStyle.Secondary)
-  );
-
-  return i.reply({
+  return safeReply(i,{
     content: 'กรุณาเลือกรูปแบบการเช็คเคส:',
     components: [row],
     ephemeral: true
@@ -419,7 +415,7 @@ const myCases = cases.filter(c => {
       { name: '📊 รวมทั้งหมด', value: `${myCases.length}` }
     );
 
-  return i.editReply({ embeds: [embed] });
+  return safeEdit(i, { embeds: [embed] });
 }
 if (i.customId === 'mycase_all') {
   await i.deferReply({ ephemeral: true });
@@ -880,7 +876,7 @@ if (interaction.isButton() && interaction.customId === 'export_excel') {
   คดีปกติ: data.normal,
   Take2: data.take2,
   'คดีส้ม-แดง': data.orange_red,
-  วังร้าน: data.store,
+  งัดร้าน: data.store,
   รวมทั้งหมด: data.total
 }));
 
@@ -1004,9 +1000,16 @@ if (i.isUserSelectMenu() && i.customId === 'select_user_to_check') {
 
   } catch (err) {
     console.error('INTERACTION ERROR:', err);
-    if (interaction.isRepliable() && !interaction.replied) {
+    if (interaction.isRepliable()) {
+  try {
+    if (interaction.deferred || interaction.replied) {
+      await interaction.followUp({ content: '❌ เกิดข้อผิดพลาด', ephemeral: true });
+    } else {
       await interaction.reply({ content: '❌ เกิดข้อผิดพลาด', ephemeral: true });
     }
+  } catch {}
+}
+
   }
 });
 
