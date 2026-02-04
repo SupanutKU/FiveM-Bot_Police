@@ -1,27 +1,25 @@
 function parseDutyEmbed(embed) {
-  const text = embed.description || '';
+  if (!embed?.fields?.length) return null;
 
-  const uidMatch = text.match(/UID\s*:\s*(\d+)/i);
-  const nameMatch = text.match(/เจ้าหน้าที่\s*:\s*(.+)/i);
-  const timeMatch = text.match(
-    /(\d{2}-\d{2}-\d{4}\s\d{2}:\d{2}:\d{2})/
-  );
+  const get = name =>
+    embed.fields.find(f => f.name.includes(name))?.value;
 
-  if (!uidMatch || !nameMatch || !timeMatch) return null;
+  const uid = get('ID');
+  const name = get('ชื่อ');
+  const actionRaw = embed.title || '';
+  const time = embed.timestamp || new Date().toISOString();
 
-  const action = text.includes('เข้าเวร')
-    ? 'on'
-    : text.includes('ออกเวร')
-    ? 'off'
-    : null;
+  let action = null;
+  if (actionRaw.includes('เข้าเวร')) action = 'on';
+  if (actionRaw.includes('ออกเวร')) action = 'off';
 
-  if (!action) return null;
+  if (!uid || !name || !action) return null;
 
   return {
-    uid: uidMatch[1],
-    name: nameMatch[1].trim(),
+    uid: uid.replace(/\D/g, ''),
+    name: name.replace(/[*_`]/g, ''),
     action,
-    timestamp: timeMatch[1]
+    time
   };
 }
 

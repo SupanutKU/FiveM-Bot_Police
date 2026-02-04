@@ -1,5 +1,7 @@
 require('dotenv').config();
 require('./duty/dutyListener')(client);
+const { Client, GatewayIntentBits } = require('discord.js');
+const dutyListener = require('./duty/dutyListener');
 const express = require('express');
 const app = express();
 
@@ -998,7 +1000,7 @@ if (i.isUserSelectMenu() && i.customId === 'select_user_to_check') {
 
   return i.editReply({ embeds: [embed] });
 }
-
+dutyListener(client);
 
   } catch (err) {
     console.error('INTERACTION ERROR:', err);
