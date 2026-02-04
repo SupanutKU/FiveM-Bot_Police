@@ -1,0 +1,12 @@
+# Node
+node_modules/
+
+# Env
+.env
+
+# Excel exports
+cases-*.xlsx
+
+# OS
+.DS_Store
+Thumbs.db

@@ -1,0 +1,58 @@
+{
+  "cases": [
+    {
+      "id": 1770223333360,
+      "officer": "502660749588561924",
+      "type": "normal",
+      "helpers": [],
+      "createdAt": "2026-02-04T16:42:13.360Z",
+      "imageUrl": "https://cdn.discordapp.com/attachments/1468647794590875689/1468647827646316646/00001.PNG?ex=6984c860&is=698376e0&hm=ac10a7ece26e329b90afcf166f09514903dd30ebd3d53420ab19fb99f5fa277a&",
+      "logMessageId": "1468647854154317876"
+    },
+    {
+      "id": 1770223335733,
+      "officer": "933177300399304764",
+      "type": "normal",
+      "helpers": [],
+      "createdAt": "2026-02-04T16:42:15.733Z",
+      "imageUrl": "https://cdn.discordapp.com/attachments/1468647784377749607/1468647844679385249/Screenshot_2026-01-22_231319.png?ex=6984c864&is=698376e4&hm=524eceb01c307ab3e5ad920844db77635c2d26bce91e6e26f350461c44c8c3bf&",
+      "logMessageId": "1468647864031777020"
+    },
+    {
+      "id": 1770223471021,
+      "officer": "502660749588561924",
+      "type": "store",
+      "helpers": [],
+      "createdAt": "2026-02-04T16:44:31.021Z",
+      "imageUrl": "https://cdn.discordapp.com/attachments/1468648342564376713/1468648405713817666/218_20251203215713_1.png?ex=6984c8ea&is=6983776a&hm=73ab18a7f4fcca55e7c539fd802b77ce693b89ef72b389c2fd2b15ce52ab4833&",
+      "logMessageId": "1468648431395278859"
+    },
+    {
+      "id": 1770223493175,
+      "officer": "933177300399304764",
+      "type": "take2",
+      "helpers": [],
+      "createdAt": "2026-02-04T16:44:53.175Z",
+      "imageUrl": "https://cdn.discordapp.com/attachments/1468648468682899681/1468648507261845739/Screenshot_2026-01-22_231319.png?ex=6984c902&is=69837782&hm=335f82509caabc3b8c44baf168d8ef4ccf7b2d379ff7296843c10a17e0dfcf69&",
+      "logMessageId": "1468648524454564034"
+    },
+    {
+      "id": 1770223507813,
+      "officer": "502660749588561924",
+      "type": "store",
+      "helpers": [],
+      "createdAt": "2026-02-04T16:45:07.813Z",
+      "imageUrl": "https://cdn.discordapp.com/attachments/1468648526027292712/1468648562832441591/00001.PNG?ex=6984c90f&is=6983778f&hm=ad49bbf37282bbc10dde8fb356b819cdc561fe008b2a8377dd31343cfa953f3e&",
+      "logMessageId": "1468648585456521248"
+    },
+    {
+      "id": 1770223711858,
+      "officer": "502660749588561924",
+      "type": "normal",
+      "helpers": [],
+      "createdAt": "2026-02-04T16:48:31.858Z",
+      "imageUrl": "https://cdn.discordapp.com/attachments/1468649386681700406/1468649417748774922/001.PNG?ex=6984c9db&is=6983785b&hm=c6b11318133dc3a0204e012aceb9ed04fe4bc288128f77540f28e748d392d151&",
+      "logMessageId": "1468649441568493742"
+    }
+  ]
+}
