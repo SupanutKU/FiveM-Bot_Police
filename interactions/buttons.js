@@ -148,17 +148,4 @@ module.exports = async (interaction) => {
     );
   }
 };
-const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 
-function dutyExportButton() {
-  return new ActionRowBuilder().addComponents(
-    new ButtonBuilder()
-      .setCustomId('EXPORT_DUTY_EXCEL')
-      .setLabel('📤 Export Duty (Excel)')
-      .setStyle(ButtonStyle.Primary)
-  );
-}
-
-module.exports = {
-  dutyExportButton,
-};
