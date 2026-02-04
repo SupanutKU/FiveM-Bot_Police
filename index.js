@@ -185,7 +185,18 @@ client.on(Events.MessageCreate, msg => {
 });
 
 client.on(Events.InteractionCreate, async (interaction) => {
-  try {
+  try {    
+    if (
+      interaction.isChatInputCommand() ||
+      interaction.isButton() ||
+      interaction.isModalSubmit() ||
+      interaction.isUserSelectMenu()
+    ) {
+      if (!interaction.deferred && !interaction.replied) {
+        await interaction.deferReply({ ephemeral: true });
+      }
+    }
+
     /* ===== SLASH ===== */
     if (interaction.isChatInputCommand()) {
       const cmd = client.commands.get(interaction.commandName);
@@ -533,10 +544,10 @@ if (interaction.isModalSubmit() && interaction.customId === 'add_helper_modal') 
 
   await approveChannel.send({ embeds: [embed], components: [row] });
 
-  return interaction.reply({
-    content: '📨 ส่งคำขอเพิ่มชื่อเรียบร้อยแล้ว',
-    ephemeral: true
+  return interaction.editReply({
+    content: '📨 ส่งคำขอเพิ่มชื่อเรียบร้อยแล้ว'
   });
+
 }
 if (
   interaction.isButton() &&
