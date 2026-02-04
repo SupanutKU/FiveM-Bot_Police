@@ -3,7 +3,7 @@ const ExcelJS = require('exceljs');
 const path = require('path');
 
 module.exports = async function exportDutyExcel() {
-  const dbPath = path.join(__dirname, '../data/duty.db');
+  const dbPath = path.join(__dirname, '../duty.db');
   const db = new sqlite3.Database(dbPath);
 
   const workbook = new ExcelJS.Workbook();

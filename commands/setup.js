@@ -12,7 +12,7 @@ module.exports = {
 
   async execute(interaction) {
 
-    // แถวที่ 1 : ลงคดี
+    /* ================= ROW 1 : ลงคดี ================= */
     const row1 = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
         .setCustomId('case_normal')
@@ -35,7 +35,7 @@ module.exports = {
         .setStyle(ButtonStyle.Danger)
     );
 
-    // แถวที่ 2 : จัดการเคส
+    /* ================= ROW 2 : จัดการเคส ================= */
     const row2 = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
         .setCustomId('check_my_case')
@@ -53,7 +53,7 @@ module.exports = {
         .setStyle(ButtonStyle.Secondary)
     );
 
-    // แถวที่ 3 : รายงาน
+    /* ================= ROW 3 : รายงาน / DB ================= */
     const row3 = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
         .setCustomId('export_excel')

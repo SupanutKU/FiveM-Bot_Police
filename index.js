@@ -37,6 +37,7 @@ const {
   UserSelectMenuBuilder
 } = require('discord.js');
 
+const { dutyExportButton } = require('./interactions/buttons');
 const exportDutyExcel = require('./duty/exportDutyExcel');
 const sqlite3 = require('sqlite3').verbose();
 const fs = require('fs');
@@ -781,6 +782,13 @@ if (interaction.isButton() && interaction.customId === 'export_excel') {
     }
 
     const workbook = XLSX.utils.book_new();
+// ===== EXPORT DUTY DB =====
+let dutyFilePath = null;
+try {
+  dutyFilePath = await exportDutyExcel();
+} catch (e) {
+  console.warn('ไม่มีข้อมูล duty หรือ export ไม่ได้:', e.message);
+}
 
     /* ================= GROUP DATA ================= */
     const groupedByType = {
@@ -921,10 +929,17 @@ if (interaction.isButton() && interaction.customId === 'export_excel') {
     const filePath = path.join(__dirname, `cases-${Date.now()}.xlsx`);
     XLSX.writeFile(workbook, filePath);
 
-    await interaction.editReply({
-      content: '📊 สรุปเคสครบทุกมุม (แยก Sheet + Dashboard)',
-      files: [filePath]
-    });
+    const files = [filePath];
+
+if (dutyFilePath) {
+  files.push(dutyFilePath);
+}
+
+await interaction.editReply({
+  content: '📊 สรุปเคสทั้งหมด + เวร (DB)',
+  files
+});
+
 
     setTimeout(() => {
       if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
@@ -1062,9 +1077,7 @@ function exportDutyExcel() {
 
   }
 });
-exportDutyExcel()
-  .then(file => console.log('📊 Export สำเร็จ:', file))
-  .catch(err => console.error('❌ Export ล้มเหลว:', err.message));
+
 /* ================= LOGIN ================= */
 if (!process.env.DISCORD_TOKEN) {
   console.error('❌ DISCORD_TOKEN is missing!');
