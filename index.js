@@ -1,4 +1,5 @@
 require('dotenv').config();
+require('./duty/dutyListener')(client);
 const express = require('express');
 const app = express();
 
