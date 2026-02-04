@@ -1,4 +1,14 @@
 require('dotenv').config();
+const express = require('express');
+const app = express();
+
+app.get('/', (req, res) => {
+  res.send('Bot Police is running');
+});
+
+app.listen(process.env.PORT || 3000, () => {
+  console.log('Web server ready');
+});
 
 /* ================= CONFIG ================= */
 const LOG_CHANNEL_ID = '1464986343938593021';
