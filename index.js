@@ -1,6 +1,5 @@
 require('dotenv').config();
 require('./duty/dutyListener')(client);
-const { Client, GatewayIntentBits } = require('discord.js');
 const dutyListener = require('./duty/dutyListener');
 const express = require('express');
 const app = express();
