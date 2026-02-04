@@ -37,7 +37,6 @@ const {
   UserSelectMenuBuilder
 } = require('discord.js');
 
-const dutyListener = require('./duty/dutyListener');
 const fs = require('fs');
 const path = require('path');
 const XLSX = require('xlsx');
