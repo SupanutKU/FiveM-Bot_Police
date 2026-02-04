@@ -74,10 +74,11 @@ async function safeReply(interaction, options) {
 }
 
 async function safeEdit(interaction, options) {
-  if (interaction.replied) {
+  if (interaction.replied || interaction.deferred) {
     return interaction.editReply(options);
+  } else {
+    return interaction.reply(options);
   }
-  return interaction.reply(options);
 }
 
 /* ✅ FIX 1: INIT COMMANDS */
@@ -1005,7 +1006,7 @@ if (i.isUserSelectMenu() && i.customId === 'select_user_to_check') {
     if (interaction.deferred || interaction.replied) {
       await interaction.followUp({ content: '❌ เกิดข้อผิดพลาด', ephemeral: true });
     } else {
-      await interaction.reply({ content: '❌ เกิดข้อผิดพลาด', ephemeral: true });
+      await interaction.editReply({ content: '❌ เกิดข้อผิดพลาด', ephemeral: true });
     }
   } catch {}
 }
