@@ -38,11 +38,11 @@ const {
 } = require('discord.js');
 
 const { dutyExportButton } = require('./interactions/buttons');
-const exportDutyExcel = require('./duty/exportDutyExcel');
 const sqlite3 = require('sqlite3').verbose();
 const fs = require('fs');
 const path = require('path');
 const XLSX = require('xlsx');
+const getDutyRows = require('./duty/exportDutyExcel');
 async function getMemberName(guild, userId) {
   try {
     const member = await guild.members.fetch(userId);
@@ -782,14 +782,25 @@ if (interaction.isButton() && interaction.customId === 'export_excel') {
     }
 
     const workbook = XLSX.utils.book_new();
-// ===== EXPORT DUTY DB =====
-let dutyFilePath = null;
-try {
-  dutyFilePath = await exportDutyExcel();
-} catch (e) {
-  console.warn('ไม่มีข้อมูล duty หรือ export ไม่ได้:', e.message);
-}
+    // ===== EXPORT DUTY (เข้า-ออกเวร) =====
+const dutyRows = await getDutyRows();
 
+if (dutyRows.length > 0) {
+  const wsDuty = XLSX.utils.json_to_sheet(dutyRows);
+
+  wsDuty['!cols'] = [
+    { wch: 8 },   // ลำดับ
+    { wch: 20 },  // เจ้าหน้าที่
+    { wch: 15 },  // สถานะ
+    { wch: 25 }   // เวลา
+  ];
+
+  XLSX.utils.book_append_sheet(
+    workbook,
+    wsDuty,
+    'เข้า-ออกเวร'
+  );
+}
     /* ================= GROUP DATA ================= */
     const groupedByType = {
       normal: [],
@@ -931,9 +942,6 @@ try {
 
     const files = [filePath];
 
-if (dutyFilePath) {
-  files.push(dutyFilePath);
-}
 
 await interaction.editReply({
   content: '📊 สรุปเคสทั้งหมด + เวร (DB)',
@@ -1016,51 +1024,6 @@ if (i.isUserSelectMenu() && i.customId === 'select_user_to_check') {
     .setFooter({ text: `ID: ${targetUserId}` });
 
   return i.editReply({ embeds: [embed] });
-}
-/* ================= DATA ================= */
-function exportDutyExcel() {
-  return new Promise((resolve, reject) => {
-    const dbPath = path.join(__dirname, 'duty.db');
-    const db = new sqlite3.Database(dbPath);
-
-    const sql = `
-      SELECT 
-        id AS 'ID',
-        user_id AS 'User ID',
-        action AS 'Action',
-        position AS 'ตำแหน่ง',
-        datetime(timestamp, 'localtime') AS 'เวลา'
-      FROM duty_logs
-      ORDER BY timestamp ASC
-    `;
-
-    db.all(sql, [], (err, rows) => {
-      if (err) {
-        db.close();
-        return reject(err);
-      }
-
-      if (!rows.length) {
-        db.close();
-        return reject(new Error('ไม่มีข้อมูลใน duty_logs'));
-      }
-
-      const workbook = XLSX.utils.book_new();
-      const worksheet = XLSX.utils.json_to_sheet(rows);
-
-      XLSX.utils.book_append_sheet(workbook, worksheet, 'Duty Logs');
-
-      const filePath = path.join(
-        __dirname,
-        `duty_logs_${Date.now()}.xlsx`
-      );
-
-      XLSX.writeFile(workbook, filePath);
-
-      db.close();
-      resolve(filePath);
-    });
-  });
 }
 
   } catch (err) {
