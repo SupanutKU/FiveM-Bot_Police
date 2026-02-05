@@ -10,7 +10,7 @@ const {
 
 const exportDutyExcel = require('../duty/exportDutyExcel');
 const exportExcel = require('../utils/excelExport');
-const weeklySummary = require('../utils/weeklySummary');
+const weeklySummary = require('../jobs/weeklySummary');
 
 const DATA_PATH = path.join(__dirname, '../data/cases.json');
 
