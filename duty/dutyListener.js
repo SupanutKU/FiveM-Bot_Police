@@ -1,5 +1,10 @@
 const { parseDutyEmbed } = require('./dutyParser');
 const { insertDutyLog } = require('./dutyService');
+const sqlite3 = require('sqlite3').verbose();
+const path = require('path');
+
+const dbPath = path.join(__dirname, 'duty.db');
+const db = new sqlite3.Database(dbPath);
 
 module.exports = client => {
   console.log('✅ Duty listener loaded');
