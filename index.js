@@ -69,55 +69,64 @@ client.once(Events.ClientReady, () => {
   console.log(`✅ Logged in as ${client.user.tag}`);
 });
 
-/* ================= CREATE CASE CHANNEL ================= */
+/* ================= CREATE CASE CHANNEL (FINAL FIX) ================= */
 async function createCaseChannel(interaction, caseType) {
   const guild = interaction.guild;
   const user = interaction.user;
 
+  // ✅ ตอบ interaction ทันที กัน interaction ตาย
+  await interaction.editReply('⏳ กำลังสร้างห้องคดี...');
+
+  let channel;
+
   try {
     const category = await guild.channels.fetch(CASE_CATEGORY_ID);
-    if (!category || category.type !== ChannelType.GuildCategory) {
+    if (!category) {
       return interaction.editReply('❌ ไม่พบหมวดคดี');
     }
 
-    // ✅ สร้างห้อง + ผูกหมวด + permission ในครั้งเดียว
-    const channel = await guild.channels.create({
+    // 1️⃣ สร้างห้องก่อน
+    channel = await guild.channels.create({
       name: `📁-คดี-${user.username}`,
-      type: ChannelType.GuildText,
-      parent: category.id,
-      permissionOverwrites: [
-        {
-          id: guild.roles.everyone.id,
-          deny: [PermissionFlagsBits.ViewChannel]
-        },
-        {
-          id: user.id,
-          allow: [
-            PermissionFlagsBits.ViewChannel,
-            PermissionFlagsBits.SendMessages,
-            PermissionFlagsBits.ReadMessageHistory
-          ]
-        },
-        {
-          id: CASE_LEADER_ROLE_ID,
-          allow: [
-            PermissionFlagsBits.ViewChannel,
-            PermissionFlagsBits.SendMessages,
-            PermissionFlagsBits.ReadMessageHistory
-          ]
-        }
-      ]
+      type: ChannelType.GuildText
     });
+
+    // 2️⃣ ย้ายเข้าหมวด (วิธีที่นิ่งสุด)
+    await channel.setParent(category.id, { lockPermissions: false });
+
+    // 3️⃣ ตั้ง permission
+    await channel.permissionOverwrites.set([
+      {
+        id: guild.roles.everyone.id,
+        deny: [PermissionFlagsBits.ViewChannel]
+      },
+      {
+        id: user.id,
+        allow: [
+          PermissionFlagsBits.ViewChannel,
+          PermissionFlagsBits.SendMessages,
+          PermissionFlagsBits.ReadMessageHistory
+        ]
+      },
+      {
+        id: CASE_LEADER_ROLE_ID,
+        allow: [
+          PermissionFlagsBits.ViewChannel,
+          PermissionFlagsBits.SendMessages,
+          PermissionFlagsBits.ReadMessageHistory
+        ]
+      }
+    ]);
 
     caseRooms.set(channel.id, {
       ownerId: user.id,
       caseType
     });
 
-    // ✅ ตอบ interaction แค่นี้ถือว่าสำเร็จแล้ว
+    // 4️⃣ แจ้งว่าผ่านแล้ว
     await interaction.editReply(`✅ สร้างห้อง ${channel} เรียบร้อย`);
 
-    // ✅ ส่งข้อความในห้อง (พังไม่ย้อน error)
+    // 5️⃣ ส่งข้อความในห้อง (ล้ม = ไม่กระทบ interaction)
     const row = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
         .setCustomId('submit_case')
@@ -138,12 +147,15 @@ async function createCaseChannel(interaction, caseType) {
     });
 
   } catch (err) {
-    console.error('CREATE CASE CHANNEL ERROR:', err);
-    if (!interaction.replied) {
-      await interaction.editReply('❌ สร้างห้องไม่สำเร็จ');
-    }
+    console.error('CREATE CASE ERROR:', err);
+
+    // ❗ อย่าพยายามตอบ interaction ถ้ามันตายแล้ว
+    try {
+      await interaction.editReply('❌ เกิดข้อผิดพลาดระหว่างสร้างห้อง');
+    } catch {}
   }
 }
+
 
 /* ================= INTERACTIONS ================= */
 client.on(Events.InteractionCreate, async interaction => {
