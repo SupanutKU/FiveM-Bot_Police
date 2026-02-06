@@ -12,12 +12,12 @@ app.listen(process.env.PORT || 3000, () => {
 });
 
 /* ================= CONFIG ================= */
-const LOG_CHANNEL_ID = '1469342649319162081';
-const APPROVE_CHANNEL_ID = '1461296754916851889';
-const CASE_LEADER_ROLE_ID = '1464250545924739207';
+const LOG_CHANNEL_ID = '1464986343938593021';
+const APPROVE_CHANNEL_ID = '1464986705516822560';
+const CASE_LEADER_ROLE_ID = '1450344680670887987';
 const ALLOWED_ROLES = [
-  '1461318666741092495',
-  '1464250545924739207',
+  '1450345959589412936',
+  '1450344680670887987'
 ];
 
 /* ================= DISCORD ================= */
@@ -38,11 +38,11 @@ const {
 } = require('discord.js');
 
 const { dutyExportButton } = require('./interactions/buttons');
+const exportDutyExcel = require('./duty/exportDutyExcel');
 const sqlite3 = require('sqlite3').verbose();
 const fs = require('fs');
 const path = require('path');
 const XLSX = require('xlsx');
-const getDutyRows = require('./duty/exportDutyExcel');
 async function getMemberName(guild, userId) {
   try {
     const member = await guild.members.fetch(userId);
@@ -150,85 +150,20 @@ async function createCaseChannel(interaction, caseType) {
   const guild = interaction.guild;
   const user = interaction.user;
 
-  const CATEGORY_ID = '1461297109088075947';
-  const POLICE_ROLE_ID = '1461296754916851889'; // 👮‍♂️ police
-
-  function getCaseNameTH(type) {
-    switch (type) {
-      case 'normal': return 'คดีปกติ';
-      case 'take2': return 'take2';
-      case 'orange_red': return 'ส้ม-แดง';
-      case 'store': return 'งัดร้าน';
-      default: return 'คดี';
-    }
-  }
-
-  const caseName = getCaseNameTH(caseType);
-  let channel;
-
-  try {
-    channel = await guild.channels.create({
-      name: `คดี-${caseName}-${user.username}`,
-      type: ChannelType.GuildText,
-      parent: CATEGORY_ID,
-      lockPermissions: false,
-      permissionOverwrites: [
-        // ❌ ทุกคนไม่เห็น
-        {
-          id: guild.roles.everyone.id,
-          deny: [
-            PermissionFlagsBits.ViewChannel,
-            PermissionFlagsBits.SendMessages
-          ]
-        },
-
-        // 👮‍♂️ police เห็น + พิมพ์ได้
-        {
-          id: POLICE_ROLE_ID,
-          allow: [
-            PermissionFlagsBits.ViewChannel,
-            PermissionFlagsBits.SendMessages,
-            PermissionFlagsBits.ReadMessageHistory,
-            PermissionFlagsBits.AttachFiles
-          ]
-        },
-
-        // 🤖 bot
-        {
-          id: interaction.client.user.id,
-          allow: [
-            PermissionFlagsBits.ViewChannel,
-            PermissionFlagsBits.SendMessages,
-            PermissionFlagsBits.ReadMessageHistory,
-            PermissionFlagsBits.AttachFiles,
-            PermissionFlagsBits.EmbedLinks
-          ]
-        },
-
-        // 👤 เจ้าของคดี
-        {
-          id: user.id,
-          allow: [
-            PermissionFlagsBits.ViewChannel,
-            PermissionFlagsBits.SendMessages,
-            PermissionFlagsBits.ReadMessageHistory,
-            PermissionFlagsBits.AttachFiles
-          ]
-        }
-      ]
-    });
-
-  } catch (e) {
-    console.error('CREATE CHANNEL FAIL:', e);
-    return interaction.editReply('❌ สร้างห้องไม่สำเร็จ (permission)');
-  }
+  const channel = await guild.channels.create({
+    name: `📁-คดี-${user.username}`,
+    type: ChannelType.GuildText,
+    permissionOverwrites: [
+      { id: guild.roles.everyone, allow: [PermissionFlagsBits.ViewChannel] }
+    ]
+  });
 
   caseRooms.set(channel.id, {
     ownerId: user.id,
-    caseType,
-    tagged: new Map(),
     hasImage: false,
-    imageUrl: null
+    imageUrl: null,
+    tagged: new Map(),
+    caseType
   });
 
   const row = new ActionRowBuilder().addComponents(
@@ -243,25 +178,14 @@ async function createCaseChannel(interaction, caseType) {
   );
 
   await interaction.editReply(`✅ สร้างห้อง ${channel} เรียบร้อย`);
-
   await channel.send({
     content:
-`สวัสดี <@${user.id}>!
-คุณสามารถพิมพ์และอัปโหลดรูปในห้องนี้ได้คนเดียว
-*(ยกเว้นแอดมิน / AGENCY)*
-
-⏰ **จำกัดเวลา:** 30 นาที
-📸 **ต้องมีรูปภาพภายในเวลาที่กำหนด**
-
-> อัปโหลดรูปภาพ, Tag (@) ผู้ช่วยเหลือ, จากนั้นกด **ส่งคดี**
-
-⚠️ **คำเตือน: หากเกินเวลา 30 นาที**
-❌ ไม่มีรูปภาพ: ห้องจะถูกลบอัตโนมัติ
-✅ มีรูปภาพ: จะส่งคดีอัตโนมัติและลบห้อง`,
+      `👤 เจ้าของห้อง: <@${user.id}>\n` +
+      `📂 ประเภทคดี: ${caseType}\n\n` +
+      `📸 ต้องส่งรูปก่อน\n🏷️ แท็กผู้ช่วย`,
     components: [row]
   });
 }
-
 
 /* ================= MESSAGE TRACK ================= */
 client.on(Events.MessageCreate, msg => {
@@ -303,10 +227,9 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
     /* ===== CREATE CASE ===== */
     if (caseMap[i.customId]) {
-  await i.deferReply({ ephemeral: true });
-  return createCaseChannel(i, caseMap[i.customId]);
-}
-
+      await i.deferReply({ ephemeral: true });
+      return createCaseChannel(i, caseMap[i.customId]);
+    }
     /* ===== SUBMIT CASE (PREVIEW) ===== */
 if (i.isButton() && i.customId === 'submit_case') {
   await i.deferUpdate();
@@ -316,6 +239,7 @@ if (i.isButton() && i.customId === 'submit_case') {
     return i.channel.send('❌ ห้องนี้ไม่ใช่ห้องคดี');
   }
 
+  // 🔐 CHECK PERMISSION
   const isOwner = i.user.id === room.ownerId;
   const isHelper = room.tagged.has(i.user.id);
 
@@ -323,46 +247,39 @@ if (i.isButton() && i.customId === 'submit_case') {
     return i.channel.send('❌ เฉพาะเจ้าของคดีหรือผู้ช่วยเท่านั้นที่ส่งคดีได้');
   }
 
+  if (!room.hasImage) {
+    return i.channel.send('❌ ต้องส่งรูปก่อนถึงจะส่งคดีได้');
+  }
+  const helpers =
+    room.tagged.size > 0
+      ? [...room.tagged.keys()].map(id => `<@${id}>`).join(', ')
+      : 'ไม่มี';
+
   const embed = new EmbedBuilder()
-    .setColor(0x2b2d31)
-    .setTitle(`สวัสดี 👋 <@${i.user.id}>`)
-    .setDescription(
-      `คุณสามารถพิมพ์และอัปโหลดรูปในห้องนี้ได้คนเดียว (ยกเว้นแอดมิน/ยศสูง)\n\n` +
-      `⏱️ **จำกัดเวลา:** 30 นาที\n` +
-      `📸 **ต้องมีรูปภาพภายในเวลาที่กำหนด**\n\n` +
-      `**ขั้นตอนการส่งคดี**\n` +
-      `1) อัปโหลดรูปภาพหลักฐาน\n` +
-      `2) Tag (@) ผู้ช่วยเหลือ (ถ้ามี)\n` +
-      `3) กดปุ่ม **ส่งคดี**\n\n` +
-      `⚠️ **คำเตือน:** หากเกินเวลา 30 นาที\n` +
-      `❌ ไม่มีรูปภาพ: ห้องจะถูกลบอัตโนมัติ\n` +
-      `✅ มีรูปภาพ: จะส่งคดีอัตโนมัติและลบห้อง`
+    .setColor(0xf1c40f)
+    .setTitle('📋 ตรวจทานข้อมูลคดี')
+    .addFields(
+      { name: '📂 ประเภทคดี', value: room.caseType, inline: true },
+      { name: '👮 คนลงคดี', value: `<@${room.ownerId}>`, inline: true },
+      { name: '🛠 ผู้ช่วย', value: helpers },
+      { name: '🕒 เวลา', value: new Date().toLocaleString('th-TH') }
     )
-    .setFooter({ text: 'Bot Police System' });
+    .setImage(room.imageUrl)
+    .setFooter({ text: 'กรุณาตรวจสอบก่อนยืนยันส่งคดี' });
 
   const row = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId('confirm_submit')
-      .setLabel('ส่งคดี')
+      .setLabel('✅ ยืนยันส่งคดี')
       .setStyle(ButtonStyle.Success),
-
     new ButtonBuilder()
-      .setCustomId('add_helper')
-      .setLabel('เพิ่ม Tag')
-      .setStyle(ButtonStyle.Primary),
-
-    new ButtonBuilder()
-      .setCustomId('delete_case')
-      .setLabel('ลบห้อง')
+      .setCustomId('cancel_submit')
+      .setLabel('❌ ยกเลิก')
       .setStyle(ButtonStyle.Danger)
   );
 
-  await i.channel.send({
-    embeds: [embed],
-    components: [row]
-  });
+  return i.channel.send({ embeds: [embed], components: [row] });
 }
-
 /* ===== CONFIRM SUBMIT ===== */
 if (i.isButton() && i.customId === 'confirm_submit') {
   await i.deferUpdate();
@@ -865,25 +782,14 @@ if (interaction.isButton() && interaction.customId === 'export_excel') {
     }
 
     const workbook = XLSX.utils.book_new();
-    // ===== EXPORT DUTY (เข้า-ออกเวร) =====
-const dutyRows = await getDutyRows();
-
-if (dutyRows.length > 0) {
-  const wsDuty = XLSX.utils.json_to_sheet(dutyRows);
-
-  wsDuty['!cols'] = [
-    { wch: 8 },   // ลำดับ
-    { wch: 20 },  // เจ้าหน้าที่
-    { wch: 15 },  // สถานะ
-    { wch: 25 }   // เวลา
-  ];
-
-  XLSX.utils.book_append_sheet(
-    workbook,
-    wsDuty,
-    'เข้า-ออกเวร'
-  );
+// ===== EXPORT DUTY DB =====
+let dutyFilePath = null;
+try {
+  dutyFilePath = await exportDutyExcel();
+} catch (e) {
+  console.warn('ไม่มีข้อมูล duty หรือ export ไม่ได้:', e.message);
 }
+
     /* ================= GROUP DATA ================= */
     const groupedByType = {
       normal: [],
@@ -1025,6 +931,9 @@ if (dutyRows.length > 0) {
 
     const files = [filePath];
 
+if (dutyFilePath) {
+  files.push(dutyFilePath);
+}
 
 await interaction.editReply({
   content: '📊 สรุปเคสทั้งหมด + เวร (DB)',
@@ -1107,6 +1016,51 @@ if (i.isUserSelectMenu() && i.customId === 'select_user_to_check') {
     .setFooter({ text: `ID: ${targetUserId}` });
 
   return i.editReply({ embeds: [embed] });
+}
+/* ================= DATA ================= */
+function exportDutyExcel() {
+  return new Promise((resolve, reject) => {
+    const dbPath = path.join(__dirname, 'duty.db');
+    const db = new sqlite3.Database(dbPath);
+
+    const sql = `
+      SELECT 
+        id AS 'ID',
+        user_id AS 'User ID',
+        action AS 'Action',
+        position AS 'ตำแหน่ง',
+        datetime(timestamp, 'localtime') AS 'เวลา'
+      FROM duty_logs
+      ORDER BY timestamp ASC
+    `;
+
+    db.all(sql, [], (err, rows) => {
+      if (err) {
+        db.close();
+        return reject(err);
+      }
+
+      if (!rows.length) {
+        db.close();
+        return reject(new Error('ไม่มีข้อมูลใน duty_logs'));
+      }
+
+      const workbook = XLSX.utils.book_new();
+      const worksheet = XLSX.utils.json_to_sheet(rows);
+
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Duty Logs');
+
+      const filePath = path.join(
+        __dirname,
+        `duty_logs_${Date.now()}.xlsx`
+      );
+
+      XLSX.writeFile(workbook, filePath);
+
+      db.close();
+      resolve(filePath);
+    });
+  });
 }
 
   } catch (err) {
