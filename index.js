@@ -74,27 +74,25 @@ async function createCaseChannel(interaction, caseType) {
   const guild = interaction.guild;
   const user = interaction.user;
 
-  // ✅ ตอบ interaction ทันที กัน interaction ตาย
-  await interaction.editReply('⏳ กำลังสร้างห้องคดี...');
-
-  let channel;
-
   try {
     const category = await guild.channels.fetch(CASE_CATEGORY_ID);
     if (!category) {
-      return interaction.editReply('❌ ไม่พบหมวดคดี');
+      return interaction.followUp({
+        content: '❌ ไม่พบหมวดคดี',
+        ephemeral: true
+      });
     }
 
-    // 1️⃣ สร้างห้องก่อน
-    channel = await guild.channels.create({
+    // 1️⃣ สร้างห้อง
+    const channel = await guild.channels.create({
       name: `📁-คดี-${user.username}`,
       type: ChannelType.GuildText
     });
 
-    // 2️⃣ ย้ายเข้าหมวด (วิธีที่นิ่งสุด)
+    // 2️⃣ ย้ายเข้าหมวด (วิธีนิ่งสุด)
     await channel.setParent(category.id, { lockPermissions: false });
 
-    // 3️⃣ ตั้ง permission
+    // 3️⃣ permission
     await channel.permissionOverwrites.set([
       {
         id: guild.roles.everyone.id,
@@ -123,10 +121,13 @@ async function createCaseChannel(interaction, caseType) {
       caseType
     });
 
-    // 4️⃣ แจ้งว่าผ่านแล้ว
-    await interaction.editReply(`✅ สร้างห้อง ${channel} เรียบร้อย`);
+    // 4️⃣ แจ้งผู้ใช้ (ใช้ followUp เท่านั้น)
+    await interaction.followUp({
+      content: `✅ สร้างห้อง ${channel} เรียบร้อย`,
+      ephemeral: true
+    });
 
-    // 5️⃣ ส่งข้อความในห้อง (ล้ม = ไม่กระทบ interaction)
+    // 5️⃣ ส่งข้อความในห้อง
     const row = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
         .setCustomId('submit_case')
@@ -148,13 +149,13 @@ async function createCaseChannel(interaction, caseType) {
 
   } catch (err) {
     console.error('CREATE CASE ERROR:', err);
-
-    // ❗ อย่าพยายามตอบ interaction ถ้ามันตายแล้ว
-    try {
-      await interaction.editReply('❌ เกิดข้อผิดพลาดระหว่างสร้างห้อง');
-    } catch {}
+    await interaction.followUp({
+      content: '❌ เกิดข้อผิดพลาดระหว่างสร้างห้อง',
+      ephemeral: true
+    });
   }
 }
+
 
 
 /* ================= INTERACTIONS ================= */
