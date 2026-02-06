@@ -154,13 +154,13 @@ async function createCaseChannel(interaction, caseType) {
 
     const category = guild.channels.cache.get(CASE_CATEGORY_ID);
     if (!category || category.type !== ChannelType.GuildCategory) {
-      return interaction.editReply('❌ ไม่พบหมวดคดี หรือหมวดไม่ถูกต้อง');
+      return interaction.editReply('❌ ไม่พบหมวดคดี');
     }
 
+    // 1️⃣ สร้างห้องก่อน (ยังไม่ย้ายหมวด)
     const channel = await guild.channels.create({
       name: `📁-คดี-${user.username}`,
       type: ChannelType.GuildText,
-      parent: CASE_CATEGORY_ID,
       permissionOverwrites: [
         {
           id: guild.roles.everyone.id,
@@ -185,6 +185,9 @@ async function createCaseChannel(interaction, caseType) {
       ]
     });
 
+    // 2️⃣ ย้ายเข้าหมวด (จุดนี้คือหัวใจ)
+    await channel.setParent(CASE_CATEGORY_ID, { lockPermissions: false });
+
     caseRooms.set(channel.id, {
       ownerId: user.id,
       hasImage: false,
@@ -204,18 +207,18 @@ async function createCaseChannel(interaction, caseType) {
         .setStyle(ButtonStyle.Danger)
     );
 
-    await interaction.editReply(`✅ สร้างห้อง ${channel} เรียบร้อยแล้ว`);
+    await interaction.editReply(`✅ สร้างห้อง ${channel} ในหมวดเรียบร้อย`);
     await channel.send({
       content:
         `👤 เจ้าของห้อง: <@${user.id}>\n` +
         `📂 ประเภทคดี: ${caseType}\n\n` +
-        `📸 ต้องส่งรูปก่อน\n🏷️ แท็กผู้ช่วย`,
+        `📸 กรุณาส่งรูปหลักฐาน\n🏷️ แท็กผู้ช่วย`,
       components: [row]
     });
 
   } catch (err) {
     console.error('CREATE CASE CHANNEL ERROR:', err);
-    return interaction.editReply('❌ ไม่สามารถสร้างห้องคดีได้');
+    await interaction.editReply('❌ สร้างห้องไม่สำเร็จ');
   }
 }
 
