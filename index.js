@@ -158,24 +158,9 @@ client.once(Events.ClientReady, () => {
 });
 
 /* ================= CREATE CASE CHANNEL ================= */
-function getCaseNameTH(type) {
-  switch (type) {
-    case 'normal': return 'คดีปกติ';
-    case 'take2': return 'take2';
-    case 'orange_red': return 'ส้ม-แดง';
-    case 'store': return 'งัดร้าน';
-    default: return 'คดี';
-  }
-}
-
-async function createCaseChannel(interaction, caseType) {
-  const guild = interaction.guild;
-  const user = interaction.user;
-
+async function createCaseChannel(guild, user, caseType) {
   const policeCategory = guild.channels.cache.get(POLICE_CATEGORY_ID);
-  if (!policeCategory || policeCategory.type !== ChannelType.GuildCategory) {
-    return interaction.editReply('❌ ไม่พบหมวดตำรวจ');
-  }
+  if (!policeCategory) throw new Error('ไม่พบหมวดตำรวจ');
 
   const caseName = getCaseNameTH(caseType);
 
@@ -199,13 +184,13 @@ async function createCaseChannel(interaction, caseType) {
     ],
   });
 
-  // ✅ ตรงนี้คือหัวใจ (ก่อนหน้านี้ไม่ทำงาน)
+  // 🔥 สำคัญมาก: ส่งปุ่มหลังสร้างห้อง
   await channel.send({
     embeds: [
       new EmbedBuilder()
         .setTitle(`📁 ${caseName}`)
         .setDescription('กดปุ่มด้านล่างเพื่อส่งเคส')
-        .setColor(0xff8800)
+        .setColor(0xff8800),
     ],
     components: [
       new ActionRowBuilder().addComponents(
@@ -213,11 +198,33 @@ async function createCaseChannel(interaction, caseType) {
           .setCustomId('send_case')
           .setLabel('📤 ส่งเคส')
           .setStyle(ButtonStyle.Primary)
-      )
-    ]
+      ),
+    ],
   });
 
-  await interaction.editReply(`✅ สร้างห้อง ${channel} เรียบร้อย`);
+  return channel;
+}
+if (interaction.isButton() && interaction.customId.startsWith('case_')) {
+
+  await interaction.reply({
+    content: '⏳ กำลังสร้างห้องคดี...',
+    flags: 64 // ephemeral
+  });
+
+  const caseType = interaction.customId.replace('case_', '');
+
+  try {
+    const channel = await createCaseChannel(
+      interaction.guild,
+      interaction.user,
+      caseType
+    );
+
+    await interaction.editReply(`✅ สร้างห้อง ${channel} แล้ว`);
+
+  } catch (err) {
+    await interaction.editReply(`❌ เกิดข้อผิดพลาด: ${err.message}`);
+  }
 }
 
 /* ================= MESSAGE TRACK ================= */
