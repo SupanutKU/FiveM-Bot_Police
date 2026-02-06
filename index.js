@@ -152,13 +152,16 @@ async function createCaseChannel(interaction, caseType) {
   const user = interaction.user;
 
   try {
-    // 1️⃣ ตรวจหมวด
+    // 1️⃣ ตรวจหมวดคดี
     const category = await guild.channels.fetch(CASE_CATEGORY_ID);
     if (!category || category.type !== ChannelType.GuildCategory) {
-      return interaction.editReply('❌ ไม่พบหมวดคดี');
+      if (interaction.deferred || interaction.replied) {
+        await interaction.editReply('❌ ไม่พบหมวดคดี');
+      }
+      return;
     }
 
-    // 2️⃣ สร้างห้อง
+    // 2️⃣ สร้างห้อง (เข้า Category แน่นอน)
     const channel = await guild.channels.create({
       name: `📁-คดี-${user.username}`,
       type: ChannelType.GuildText,
@@ -174,6 +177,7 @@ async function createCaseChannel(interaction, caseType) {
             PermissionFlagsBits.ViewChannel,
             PermissionFlagsBits.SendMessages,
             PermissionFlagsBits.ReadMessageHistory,
+            PermissionFlagsBits.AttachFiles,
           ],
         },
         {
@@ -187,10 +191,7 @@ async function createCaseChannel(interaction, caseType) {
       ],
     });
 
-    // 🔥 รอให้ Discord sync จริง
-    await channel.fetch();
-
-    // 3️⃣ ผูกข้อมูลห้อง
+    // 3️⃣ ผูกข้อมูลห้อง (ก่อนส่งข้อความ)
     caseRooms.set(channel.id, {
       ownerId: user.id,
       caseType,
@@ -211,27 +212,38 @@ async function createCaseChannel(interaction, caseType) {
         .setStyle(ButtonStyle.Danger)
     );
 
-    // 5️⃣ ส่งข้อความแรก (พร้อมปุ่ม)
+    // 5️⃣ ส่งข้อความแรกเข้าไปในห้อง (จุดที่เคยหาย)
     await channel.send({
       content:
-        `👤 เจ้าของห้อง: <@${user.id}>\n` +
-        `📂 ประเภทคดี: ${caseType}\n\n` +
-        `📸 กรุณาส่งรูปหลักฐาน\n🏷️ แท็กผู้ช่วย`,
+        `👋 **ยินดีต้อนรับสู่ห้องคดี**\n\n` +
+        `👤 เจ้าของคดี: <@${user.id}>\n` +
+        `📂 ประเภทคดี: **${caseType}**\n` +
+        `⏰ จำกัดเวลา: **30 นาที**\n\n` +
+        `📸 กรุณาส่ง **รูปภาพหลักฐาน**\n` +
+        `🏷️ สามารถแท็กผู้ช่วยเหลือได้\n\n` +
+        `⚠️ **คำเตือน**\n` +
+        `❌ ไม่มีรูป → ห้องจะถูกลบอัตโนมัติ\n` +
+        `✅ มีรูป → คดีจะถูกดำเนินการต่อ`,
       components: [row],
     });
 
-    // 6️⃣ ตอบ interaction
-    await interaction.editReply({
-      content: '✅ สร้างห้องคดีเรียบร้อยแล้ว',
-    });
+    // 6️⃣ ตอบ interaction (ห้าม reply ซ้ำ)
+    if (interaction.deferred || interaction.replied) {
+      await interaction.editReply({
+        content: `✅ สร้างห้องคดีเรียบร้อยแล้ว: ${channel}`,
+      });
+    }
 
   } catch (err) {
     console.error('CREATE CASE ERROR:', err);
-    if (!interaction.replied) {
+
+    // ❗ ห้าม reply ใหม่ ถ้าเคย defer แล้ว
+    if (interaction.deferred || interaction.replied) {
       await interaction.editReply('❌ ไม่สามารถสร้างห้องคดีได้');
     }
   }
 }
+
 
 /* ================= MESSAGE TRACK ================= */
 client.on(Events.MessageCreate, msg => {
