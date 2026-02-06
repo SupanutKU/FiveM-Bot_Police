@@ -51,6 +51,7 @@ const client = new Client({
   ]
 });
 
+/* ================= DUTY LISTENER ================= */
 dutyListener(client);
 
 /* ================= COMMANDS ================= */
@@ -80,7 +81,7 @@ async function createCaseChannel(interaction, caseType) {
       return interaction.editReply('❌ ไม่พบหมวดคดี');
     }
 
-    // ✅ สร้างห้องเข้าหมวดทันที (นิ่งสุด)
+    // ✅ สร้างห้องเข้าหมวดทันที
     const channel = await guild.channels.create({
       name: `📁-คดี-${user.username}`,
       type: ChannelType.GuildText,
@@ -146,8 +147,11 @@ async function createCaseChannel(interaction, caseType) {
 /* ================= INTERACTIONS ================= */
 client.on(Events.InteractionCreate, async interaction => {
   try {
-    // 🔒 รับเฉพาะปุ่มเท่านั้น (กันชน dutyListener)
+    // 🔒 รับเฉพาะปุ่มเท่านั้น (กันชนกับ dutyListener)
     if (!interaction.isButton()) return;
+
+    // 🔒 กัน interaction ซ้ำ
+    if (interaction.replied || interaction.deferred) return;
 
     const caseMap = {
       case_normal: 'normal',
