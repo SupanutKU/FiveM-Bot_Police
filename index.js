@@ -19,17 +19,6 @@ const ALLOWED_ROLES = [
   '1461318666741092495',
   '1464250545924739207',
 ];
-const POLICE_CATEGORY_ID = "1461297109088075947"; // ID หมวด POLICE
-function getCaseNameTH(type) {
-  switch (type) {
-    case 'normal': return 'คดีปกติ';
-    case 'take2': return 'take2';
-    case 'orange_red': return 'ส้ม-แดง';
-    case 'store': return 'งัดร้าน';
-    default: return 'คดี';
-  }
-}
-
 
 /* ================= DISCORD ================= */
 const {
@@ -40,14 +29,13 @@ const {
   ButtonBuilder,
   ButtonStyle,
   ChannelType,
-  PermissionsBitField,   // ← ใช้ตัวนี้
+  PermissionFlagsBits,
   EmbedBuilder,
   ModalBuilder,
   TextInputBuilder,
   TextInputStyle,
   UserSelectMenuBuilder
 } = require('discord.js');
-
 
 const { dutyExportButton } = require('./interactions/buttons');
 const sqlite3 = require('sqlite3').verbose();
@@ -158,73 +146,45 @@ client.once(Events.ClientReady, () => {
 });
 
 /* ================= CREATE CASE CHANNEL ================= */
-async function createCaseChannel(guild, user, caseType) {
-  const policeCategory = guild.channels.cache.get(POLICE_CATEGORY_ID);
-  if (!policeCategory) throw new Error('ไม่พบหมวดตำรวจ');
-
-  const caseName = getCaseNameTH(caseType);
+async function createCaseChannel(interaction, caseType) {
+  const guild = interaction.guild;
+  const user = interaction.user;
 
   const channel = await guild.channels.create({
-    name: `คดี-${caseName}-${user.username}`,
+    name: `📁-คดี-${user.username}`,
     type: ChannelType.GuildText,
-    parent: policeCategory.id,
     permissionOverwrites: [
-      {
-        id: guild.id,
-        allow: [PermissionsBitField.Flags.ViewChannel],
-        deny: [PermissionsBitField.Flags.SendMessages],
-      },
-      {
-        id: user.id,
-        allow: [
-          PermissionsBitField.Flags.ViewChannel,
-          PermissionsBitField.Flags.SendMessages,
-        ],
-      },
-    ],
+      { id: guild.roles.everyone, allow: [PermissionFlagsBits.ViewChannel] }
+    ]
   });
 
-  // 🔥 สำคัญมาก: ส่งปุ่มหลังสร้างห้อง
+  caseRooms.set(channel.id, {
+    ownerId: user.id,
+    hasImage: false,
+    imageUrl: null,
+    tagged: new Map(),
+    caseType
+  });
+
+  const row = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId('submit_case')
+      .setLabel('📨 ส่งคดี')
+      .setStyle(ButtonStyle.Success),
+    new ButtonBuilder()
+      .setCustomId('delete_case')
+      .setLabel('🗑 ลบห้อง')
+      .setStyle(ButtonStyle.Danger)
+  );
+
+  await interaction.editReply(`✅ สร้างห้อง ${channel} เรียบร้อย`);
   await channel.send({
-    embeds: [
-      new EmbedBuilder()
-        .setTitle(`📁 ${caseName}`)
-        .setDescription('กดปุ่มด้านล่างเพื่อส่งเคส')
-        .setColor(0xff8800),
-    ],
-    components: [
-      new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-          .setCustomId('send_case')
-          .setLabel('📤 ส่งเคส')
-          .setStyle(ButtonStyle.Primary)
-      ),
-    ],
+    content:
+      `👤 เจ้าของห้อง: <@${user.id}>\n` +
+      `📂 ประเภทคดี: ${caseType}\n\n` +
+      `📸 ต้องส่งรูปก่อน\n🏷️ แท็กผู้ช่วย`,
+    components: [row]
   });
-
-  return channel;
-}
-if (interaction.isButton() && interaction.customId.startsWith('case_')) {
-
-  await interaction.reply({
-    content: '⏳ กำลังสร้างห้องคดี...',
-    flags: 64 // ephemeral
-  });
-
-  const caseType = interaction.customId.replace('case_', '');
-
-  try {
-    const channel = await createCaseChannel(
-      interaction.guild,
-      interaction.user,
-      caseType
-    );
-
-    await interaction.editReply(`✅ สร้างห้อง ${channel} แล้ว`);
-
-  } catch (err) {
-    await interaction.editReply(`❌ เกิดข้อผิดพลาด: ${err.message}`);
-  }
 }
 
 /* ================= MESSAGE TRACK ================= */
@@ -267,10 +227,9 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
     /* ===== CREATE CASE ===== */
     if (caseMap[i.customId]) {
-  await safeReply(i, { content: '⏳ กำลังสร้างห้อง...', ephemeral: true });
-  return createCaseChannel(i, caseMap[i.customId]);
-}
-
+      await i.deferReply({ ephemeral: true });
+      return createCaseChannel(i, caseMap[i.customId]);
+    }
     /* ===== SUBMIT CASE (PREVIEW) ===== */
 if (i.isButton() && i.customId === 'submit_case') {
   await i.deferUpdate();
