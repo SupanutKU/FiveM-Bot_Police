@@ -148,19 +148,21 @@ client.once(Events.ClientReady, () => {
 
 /* ================= CREATE CASE CHANNEL ================= */
 async function createCaseChannel(interaction, caseType) {
-  try {
-    const guild = interaction.guild;
-    const user = interaction.user;
+  const guild = interaction.guild;
+  const user = interaction.user;
 
-    const category = guild.channels.cache.get(CASE_CATEGORY_ID);
+  try {
+    // 1️⃣ ตรวจหมวด
+    const category = await guild.channels.fetch(CASE_CATEGORY_ID);
     if (!category || category.type !== ChannelType.GuildCategory) {
-      return interaction.editReply('❌ ไม่พบหมวดคดี หรือหมวดไม่ถูกต้อง');
+      return interaction.editReply('❌ ไม่พบหมวดคดี');
     }
 
+    // 2️⃣ สร้างห้อง (จบตรงนี้ถือว่าสำเร็จแล้ว)
     const channel = await guild.channels.create({
       name: `📁-คดี-${user.username}`,
       type: ChannelType.GuildText,
-      parent: CASE_CATEGORY_ID,
+      parent: category.id,
       permissionOverwrites: [
         {
           id: guild.roles.everyone.id,
@@ -185,40 +187,54 @@ async function createCaseChannel(interaction, caseType) {
       ]
     });
 
+    // 3️⃣ บันทึก memory
     caseRooms.set(channel.id, {
       ownerId: user.id,
+      caseType,
       hasImage: false,
       imageUrl: null,
-      tagged: new Map(),
-      caseType
+      tagged: new Map()
     });
 
-    const row = new ActionRowBuilder().addComponents(
-      new ButtonBuilder()
-        .setCustomId('submit_case')
-        .setLabel('📨 ส่งคดี')
-        .setStyle(ButtonStyle.Success),
-      new ButtonBuilder()
-        .setCustomId('delete_case')
-        .setLabel('🗑 ลบห้อง')
-        .setStyle(ButtonStyle.Danger)
-    );
-
-    await interaction.editReply(`✅ สร้างห้อง ${channel} เรียบร้อยแล้ว`);
-    await channel.send({
-      content:
-        `👤 เจ้าของห้อง: <@${user.id}>\n` +
-        `📂 ประเภทคดี: ${caseType}\n\n` +
-        `📸 ต้องส่งรูปก่อน\n🏷️ แท็กผู้ช่วย`,
-      components: [row]
+    // 4️⃣ ตอบ interaction (สำเร็จจริง)
+    await interaction.editReply({
+      content: `✅ สร้างห้อง ${channel} เรียบร้อยแล้ว`,
+      ephemeral: true
     });
+
+    // 5️⃣ ส่งข้อความในห้อง (แยก try กันพัง)
+    try {
+      const row = new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+          .setCustomId('submit_case')
+          .setLabel('📨 ส่งคดี')
+          .setStyle(ButtonStyle.Success),
+        new ButtonBuilder()
+          .setCustomId('delete_case')
+          .setLabel('🗑 ลบห้อง')
+          .setStyle(ButtonStyle.Danger)
+      );
+
+      await channel.send({
+        content:
+          `👤 เจ้าของห้อง: <@${user.id}>\n` +
+          `📂 ประเภทคดี: ${caseType}\n\n` +
+          `📸 กรุณาส่งรูปหลักฐาน\n🏷️ แท็กผู้ช่วย`,
+        components: [row]
+      });
+    } catch (msgErr) {
+      console.warn('SEND MESSAGE FAIL:', msgErr);
+    }
 
   } catch (err) {
-    console.error('CREATE CASE CHANNEL ERROR:', err);
-    return interaction.editReply('❌ ไม่สามารถสร้างห้องคดีได้');
+    console.error('CREATE CASE ERROR:', err);
+
+    // ❗ ตรงนี้จะขึ้นเฉพาะกรณี "ยังไม่สร้างห้อง"
+    if (!interaction.replied) {
+      await interaction.editReply('❌ ไม่สามารถสร้างห้องคดีได้');
+    }
   }
 }
-
 
 /* ================= MESSAGE TRACK ================= */
 client.on(Events.MessageCreate, msg => {
