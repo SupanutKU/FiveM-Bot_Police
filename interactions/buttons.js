@@ -15,7 +15,7 @@ const weeklySummary = require('../jobs/weeklySummary');
 const DATA_PATH = path.join(__dirname, '../data/cases.json');
 
 /* ===== ตั้งค่า ROLE หัวหน้า ===== */
-const HEAD_ROLE_ID = '1450344680670887987';
+const HEAD_ROLE_ID = '1464250545924739207';
 
 /* ===== โหลดข้อมูลเคส ===== */
 function loadCases() {

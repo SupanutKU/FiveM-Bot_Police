@@ -152,56 +152,57 @@ async function createCaseChannel(interaction, caseType) {
   const user = interaction.user;
 
   try {
-    // 1️⃣ ตรวจหมวดคดี
     const category = await guild.channels.fetch(CASE_CATEGORY_ID);
     if (!category || category.type !== ChannelType.GuildCategory) {
-      if (interaction.deferred || interaction.replied) {
-        await interaction.editReply('❌ ไม่พบหมวดคดี');
-      }
-      return;
+      return interaction.editReply('❌ ไม่พบหมวดคดี');
     }
 
-    // 2️⃣ สร้างห้อง (เข้า Category แน่นอน)
     const channel = await guild.channels.create({
       name: `📁-คดี-${user.username}`,
       type: ChannelType.GuildText,
       parent: category.id,
-      permissionOverwrites: [
-  {
-    id: guild.roles.everyone.id,
-    deny: [PermissionFlagsBits.ViewChannel],
-  },
-  {
-    id: guild.members.me.id, // ⭐ บอท
-    allow: [
-      PermissionFlagsBits.ViewChannel,
-      PermissionFlagsBits.SendMessages,
-      PermissionFlagsBits.ReadMessageHistory,
-      PermissionFlagsBits.AttachFiles,
-    ],
-  },
-  {
-    id: user.id,
-    allow: [
-      PermissionFlagsBits.ViewChannel,
-      PermissionFlagsBits.SendMessages,
-      PermissionFlagsBits.ReadMessageHistory,
-      PermissionFlagsBits.AttachFiles,
-    ],
-  },
-  {
-    id: CASE_LEADER_ROLE_ID,
-    allow: [
-      PermissionFlagsBits.ViewChannel,
-      PermissionFlagsBits.SendMessages,
-      PermissionFlagsBits.ReadMessageHistory,
-    ],
-  },
-],
 
+      // ⭐ จุดสำคัญที่สุด
+      lockPermissions: false,
+
+      permissionOverwrites: [
+        {
+          id: guild.roles.everyone.id,
+          deny: [
+            PermissionFlagsBits.ViewChannel,
+            PermissionFlagsBits.SendMessages
+          ],
+        },
+        {
+          id: guild.members.me.id, // บอท
+          allow: [
+            PermissionFlagsBits.ViewChannel,
+            PermissionFlagsBits.SendMessages,
+            PermissionFlagsBits.ReadMessageHistory,
+            PermissionFlagsBits.AttachFiles,
+          ],
+        },
+        {
+          id: user.id,
+          allow: [
+            PermissionFlagsBits.ViewChannel,
+            PermissionFlagsBits.SendMessages,
+            PermissionFlagsBits.ReadMessageHistory,
+            PermissionFlagsBits.AttachFiles,
+          ],
+        },
+        {
+          id: CASE_LEADER_ROLE_ID,
+          allow: [
+            PermissionFlagsBits.ViewChannel,
+            PermissionFlagsBits.SendMessages,
+            PermissionFlagsBits.ReadMessageHistory,
+          ],
+        },
+      ],
     });
 
-    // 3️⃣ ผูกข้อมูลห้อง (ก่อนส่งข้อความ)
+    // ผูกข้อมูลห้อง
     caseRooms.set(channel.id, {
       ownerId: user.id,
       caseType,
@@ -210,7 +211,6 @@ async function createCaseChannel(interaction, caseType) {
       imageUrl: null,
     });
 
-    // 4️⃣ ปุ่ม
     const row = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
         .setCustomId('submit_case')
@@ -222,7 +222,7 @@ async function createCaseChannel(interaction, caseType) {
         .setStyle(ButtonStyle.Danger)
     );
 
-    // 5️⃣ ส่งข้อความแรกเข้าไปในห้อง (จุดที่เคยหาย)
+    // ✅ ตอนนี้บอทส่งได้แน่นอน
     await channel.send({
       content:
         `👋 **ยินดีต้อนรับสู่ห้องคดี**\n\n` +
@@ -237,23 +237,17 @@ async function createCaseChannel(interaction, caseType) {
       components: [row],
     });
 
-    // 6️⃣ ตอบ interaction (ห้าม reply ซ้ำ)
-    if (interaction.deferred || interaction.replied) {
-      await interaction.editReply({
-        content: `✅ สร้างห้องคดีเรียบร้อยแล้ว: ${channel}`,
-      });
-    }
+    await interaction.editReply({
+      content: `✅ สร้างห้องคดีเรียบร้อยแล้ว ${channel}`,
+    });
 
   } catch (err) {
     console.error('CREATE CASE ERROR:', err);
-
-    // ❗ ห้าม reply ใหม่ ถ้าเคย defer แล้ว
     if (interaction.deferred || interaction.replied) {
       await interaction.editReply('❌ ไม่สามารถสร้างห้องคดีได้');
     }
   }
 }
-
 
 /* ================= MESSAGE TRACK ================= */
 client.on(Events.MessageCreate, msg => {
