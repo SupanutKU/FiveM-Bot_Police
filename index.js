@@ -167,28 +167,38 @@ async function createCaseChannel(interaction, caseType) {
       type: ChannelType.GuildText,
       parent: category.id,
       permissionOverwrites: [
-        {
-          id: guild.roles.everyone.id,
-          deny: [PermissionFlagsBits.ViewChannel],
-        },
-        {
-          id: user.id,
-          allow: [
-            PermissionFlagsBits.ViewChannel,
-            PermissionFlagsBits.SendMessages,
-            PermissionFlagsBits.ReadMessageHistory,
-            PermissionFlagsBits.AttachFiles,
-          ],
-        },
-        {
-          id: CASE_LEADER_ROLE_ID,
-          allow: [
-            PermissionFlagsBits.ViewChannel,
-            PermissionFlagsBits.SendMessages,
-            PermissionFlagsBits.ReadMessageHistory,
-          ],
-        },
-      ],
+  {
+    id: guild.roles.everyone.id,
+    deny: [PermissionFlagsBits.ViewChannel],
+  },
+  {
+    id: guild.members.me.id, // ⭐ บอท
+    allow: [
+      PermissionFlagsBits.ViewChannel,
+      PermissionFlagsBits.SendMessages,
+      PermissionFlagsBits.ReadMessageHistory,
+      PermissionFlagsBits.AttachFiles,
+    ],
+  },
+  {
+    id: user.id,
+    allow: [
+      PermissionFlagsBits.ViewChannel,
+      PermissionFlagsBits.SendMessages,
+      PermissionFlagsBits.ReadMessageHistory,
+      PermissionFlagsBits.AttachFiles,
+    ],
+  },
+  {
+    id: CASE_LEADER_ROLE_ID,
+    allow: [
+      PermissionFlagsBits.ViewChannel,
+      PermissionFlagsBits.SendMessages,
+      PermissionFlagsBits.ReadMessageHistory,
+    ],
+  },
+],
+
     });
 
     // 3️⃣ ผูกข้อมูลห้อง (ก่อนส่งข้อความ)
