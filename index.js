@@ -24,6 +24,8 @@ function formatThaiTimeFromUTC(dateInput) {
 }
 
 /* ================= CONFIG ================= */
+const CASE_CATEGORY_ID = '1461297109088075947';
+const POLICE_ROLE_ID = '1461296754916851889';
 const LOG_CHANNEL_ID = '1469342649319162081';
 const APPROVE_CHANNEL_ID = '1469342758668992594';
 const CASE_LEADER_ROLE_ID = '1464250545924739207';
@@ -174,6 +176,7 @@ async function createCaseChannel(interaction, caseType) {
       { id: guild.roles.everyone, allow: [PermissionFlagsBits.ViewChannel] }
     ]
   });
+  await channel.setParent('1461297109088075947');
 
   caseRooms.set(channel.id, {
     ownerId: user.id,
@@ -901,7 +904,6 @@ if (interaction.isButton() && interaction.customId === 'export_excel') {
         ลิงก์คดี: `https://discord.com/channels/${interaction.guild.id}/${LOG_CHANNEL_ID}/${c.logMessageId}`
       });
 
-      /* ---------- Count by officer ---------- */
      /* ---------- Count by officer ---------- */
 if (!countByOfficer[officerName]) {
   countByOfficer[officerName] = {
