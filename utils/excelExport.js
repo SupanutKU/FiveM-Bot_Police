@@ -26,10 +26,9 @@ module.exports = async function exportExcelFromDB() {
       XLSX.utils.book_append_sheet(wb, ws, 'Duty Logs');
 
       const filePath = path.join(
-  '/tmp',
-  `duty-${Date.now()}.xlsx`
-);
-
+        __dirname,
+        `duty-${Date.now()}.xlsx`
+      );
 
       XLSX.writeFile(wb, filePath);
       db.close();
