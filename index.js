@@ -231,7 +231,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
     }
     /* ===== SUBMIT CASE (PREVIEW) ===== */
 if (i.isButton() && i.customId === 'submit_case') {
-  await i.deferUpdate();
+  await i.deferReply({ ephemeral: true });
+
 
   const room = caseRooms.get(i.channel.id);
   if (!room) {
@@ -281,30 +282,31 @@ if (i.isButton() && i.customId === 'submit_case') {
 }
 /* ===== CONFIRM SUBMIT ===== */
 if (i.isButton() && i.customId === 'confirm_submit') {
-  await i.deferUpdate();
+  await i.deferReply({ ephemeral: true });
 
   const room = caseRooms.get(i.channel.id);
-  if (!room) return;
+  if (!room) {
+    return i.editReply('❌ ไม่พบข้อมูลคดี');
+  }
 
-  // 🔐 CHECK PERMISSION (ซ้ำอีกชั้น)
+  // 🔐 CHECK PERMISSION
   const isOwner = i.user.id === room.ownerId;
   const isHelper = room.tagged.has(i.user.id);
 
   if (!isOwner && !isHelper) {
-    return i.channel.send('❌ คุณไม่มีสิทธิ์ยืนยันส่งคดีนี้');
+    return i.editReply('❌ คุณไม่มีสิทธิ์ยืนยันส่งคดีนี้');
   }
 
   const cases = loadCases();
 
-const newCase = {
-  id: Date.now(),
-  officer: room.ownerId,
-  type: room.caseType,
-  helpers: [...room.tagged.keys()],
-  createdAt: getThaiISOString(), // ✅ เวลาไทย
-  imageUrl: room.imageUrl
-};
-
+  const newCase = {
+    id: Date.now(),
+    officer: room.ownerId,
+    type: room.caseType,
+    helpers: [...room.tagged.keys()],
+    createdAt: getThaiISOString(),
+    imageUrl: room.imageUrl
+  };
 
   const helpersText =
     newCase.helpers.length > 0
@@ -331,35 +333,14 @@ const newCase = {
   saveCases(cases);
 
   caseRooms.delete(i.channel.id);
-  await i.channel.send('✅ ส่งคดีเรียบร้อย กำลังปิดห้อง...');
+
+  await i.editReply('✅ ส่งคดีเรียบร้อย กำลังปิดห้อง...');
+  await i.channel.send('📁 คดีถูกบันทึกแล้ว');
 
   setTimeout(() => {
     i.channel.delete().catch(() => {});
   }, 2000);
 }
-/* ===== CANCEL SUBMIT ===== */
-if (i.isButton() && i.customId === 'cancel_submit') {
-  await i.deferUpdate();
-  return i.channel.send('❌ ยกเลิกการส่งคดี');
-}
-
-/* ===== DELETE CASE ROOM ===== */
-if (i.isButton() && i.customId === 'delete_case') {
-  await i.deferUpdate();
-
-  const room = caseRooms.get(i.channel.id);
-  if (!room) {
-    return i.channel.send('❌ ห้องนี้ไม่ใช่ห้องคดี');
-  }
-
-  if (i.user.id !== room.ownerId) {
-    return i.channel.send('❌ เฉพาะเจ้าของคดีเท่านั้นที่ลบห้องได้');
-  }
-
-  caseRooms.delete(i.channel.id);
-  return i.channel.delete().catch(() => {});
-}
-
 
     /* ===== เช็คเคสตัวเอง ===== */
 if (i.customId === 'check_my_case') {
@@ -388,23 +369,36 @@ if (i.customId === 'mycase_this_week') {
   const cases = loadCases();
 
 const myCases = cases.filter(c => {
-  if (c.officer !== i.user.id) return false;
+  const isOfficer = c.officer === i.user.id;
+  const isHelper = c.helpers?.includes(i.user.id);
+
+  if (!isOfficer && !isHelper) return false;
   if (!c.createdAt) return false;
 
   const caseDate = new Date(c.createdAt);
   return caseDate >= start && caseDate <= end;
 });
 
-  const count = {
-    normal: 0,
-    take2: 0,
-    orange_red: 0,
-    store: 0
-  };
+const count = {
+  normal: { officer: 0, helper: 0 },
+  take2: { officer: 0, helper: 0 },
+  orange_red: { officer: 0, helper: 0 },
+  store: { officer: 0, helper: 0 }
+};
+
 
   for (const c of myCases) {
-    if (count[c.type] !== undefined) count[c.type]++;
+  if (!count[c.type]) continue;
+
+  if (c.officer === i.user.id) {
+    count[c.type].officer++;
   }
+
+  if (c.helpers?.includes(i.user.id)) {
+    count[c.type].helper++;
+  }
+}
+
 
   const embed = new EmbedBuilder()
     .setColor(0x2ecc71)
@@ -414,12 +408,29 @@ const myCases = cases.filter(c => {
       iconURL: i.user.displayAvatarURL()
     })
     .addFields(
-      { name: '📁 คดีปกติ', value: `${count.normal}`, inline: true },
-      { name: '✌️ Take2', value: `${count.take2}`, inline: true },
-      { name: '🔴 ส้ม-แดง', value: `${count.orange_red}`, inline: true },
-      { name: '🏪 งัดร้าน', value: `${count.store}`, inline: true },
-      { name: '📊 รวมทั้งหมด', value: `${myCases.length}` }
-    );
+  {
+    name: '📁 คดีปกติ',
+    value: `👮 ${count.normal.officer} | 🛠 ${count.normal.helper}`,
+    inline: true
+  },
+  {
+    name: '✌️ Take2',
+    value: `👮 ${count.take2.officer} | 🛠 ${count.take2.helper}`,
+    inline: true
+  },
+  {
+    name: '🔴 ส้ม-แดง',
+    value: `👮 ${count.orange_red.officer} | 🛠 ${count.orange_red.helper}`,
+    inline: true
+  },
+  {
+    name: '🏪 งัดร้าน',
+    value: `👮 ${count.store.officer} | 🛠 ${count.store.helper}`,
+    inline: true
+  },
+  { name: '📊 รวมทั้งหมด', value: `${myCases.length}` }
+);
+
 
   return safeEdit(i, { embeds: [embed] });
 }
@@ -427,18 +438,25 @@ if (i.customId === 'mycase_all') {
   await i.deferReply({ ephemeral: true });
 
   const cases = loadCases();
-  const myCases = cases.filter(c => c.officer === i.user.id);
+  const myCases = cases.filter(c =>
+  c.officer === i.user.id || c.helpers?.includes(i.user.id)
+);
 
-  const count = {
-    normal: 0,
-    take2: 0,
-    orange_red: 0,
-    store: 0
-  };
 
-  for (const c of myCases) {
-    if (count[c.type] !== undefined) count[c.type]++;
+const count = {
+  normal: { officer: 0, helper: 0 },
+  take2: { officer: 0, helper: 0 },
+  orange_red: { officer: 0, helper: 0 },
+  store: { officer: 0, helper: 0 }
+};
+
+for (const c of myCases) {
+  if (c.officer === i.user.id) {
+    count[c.type].officer++;
+  } else if (c.helpers?.includes(i.user.id)) {
+    count[c.type].helper++;
   }
+}
 
   const embed = new EmbedBuilder()
     .setColor(0x5865f2)
@@ -448,12 +466,28 @@ if (i.customId === 'mycase_all') {
       iconURL: i.user.displayAvatarURL()
     })
     .addFields(
-      { name: '📁 คดีปกติ', value: `${count.normal}`, inline: true },
-      { name: '✌️ Take2', value: `${count.take2}`, inline: true },
-      { name: '🔴 ส้ม-แดง', value: `${count.orange_red}`, inline: true },
-      { name: '🏪 งัดร้าน', value: `${count.store}`, inline: true },
-      { name: '📊 รวมทั้งหมด', value: `${myCases.length}` }
-    );
+  {
+    name: '📁 คดีปกติ',
+    value: `👮 ${count.normal.officer} | 🛠 ${count.normal.helper}`,
+    inline: true
+  },
+  {
+    name: '✌️ Take2',
+    value: `👮 ${count.take2.officer} | 🛠 ${count.take2.helper}`,
+    inline: true
+  },
+  {
+    name: '🔴 ส้ม-แดง',
+    value: `👮 ${count.orange_red.officer} | 🛠 ${count.orange_red.helper}`,
+    inline: true
+  },
+  {
+    name: '🏪 งัดร้าน',
+    value: `👮 ${count.store.officer} | 🛠 ${count.store.helper}`,
+    inline: true
+  },
+  { name: '📊 รวมทั้งหมด', value: `${myCases.length}` }
+);
 
   return i.editReply({ embeds: [embed] });
 }
@@ -563,24 +597,35 @@ if (
   saveCases(cases);
 
   /* ===== UPDATE CASE LOG EMBED ===== */
-  const logChannel = await interaction.guild.channels.fetch(LOG_CHANNEL_ID);
-  const logMessage = await logChannel.messages.fetch(targetCase.logMessageId);
+ /* ===== UPDATE CASE LOG EMBED ===== */
+const logChannel = await interaction.guild.channels.fetch(LOG_CHANNEL_ID);
+const logMessage = await logChannel.messages.fetch(targetCase.logMessageId);
 
-  const helpersText =
-    targetCase.helpers.length > 0
-      ? targetCase.helpers.map(id => `<@${id}>`).join(', ')
-      : 'ไม่มี';
+// ดึง embed เดิม
+const embed = EmbedBuilder.from(logMessage.embeds[0]);
 
-  const updatedEmbed = EmbedBuilder.from(logMessage.embeds[0])
-    .spliceFields(2, 1, {
-      name: '🛠 ผู้ช่วยเหลือ',
-      value: helpersText
-    })
-    .setFooter({
-      text: `อัปเดตผู้ช่วยโดย ${interaction.user.username}`
-    });
+let desc = embed.data.description || '';
 
-  await logMessage.edit({ embeds: [updatedEmbed] });
+// แปลงรายชื่อผู้ช่วยจากเคสจริง
+const helpersText =
+  targetCase.helpers.length > 0
+    ? targetCase.helpers.map(id => `<@${id}>`).join('\n')
+    : 'ไม่มี';
+
+// แทนที่เฉพาะส่วน 🛠 ผู้ช่วย
+desc = desc.replace(
+  /🛠 ผู้ช่วย[\s\S]*?\n\n/,
+  `🛠 ผู้ช่วย\n${helpersText}\n\n`
+);
+
+embed
+  .setDescription(desc)
+  .setFooter({
+    text: `อัปเดตผู้ช่วยโดย ${interaction.user.username}`
+  });
+
+// แก้ embed ใน log
+await logMessage.edit({ embeds: [embed] });
 
   /* ===== HISTORY LOG ===== */
   const historyEmbed = new EmbedBuilder()
@@ -821,18 +866,40 @@ if (interaction.isButton() && interaction.customId === 'export_excel') {
       });
 
       /* ---------- Count by officer ---------- */
-      if (!countByOfficer[officerName]) {
-      countByOfficer[officerName] = {
+     /* ---------- Count by officer ---------- */
+if (!countByOfficer[officerName]) {
+  countByOfficer[officerName] = {
+    normal: 0,
+    take2: 0,
+    orange_red: 0,
+    store: 0,
+    total: 0
+  };
+}
+
+// คนลงคดี
+countByOfficer[officerName][c.type]++;
+countByOfficer[officerName].total++;
+
+// 🔧 เพิ่ม: นับผู้ช่วยด้วย
+if (c.helpers?.length) {
+  for (const helperId of c.helpers) {
+    const helperName = await getMemberName(interaction.guild, helperId);
+
+    if (!countByOfficer[helperName]) {
+      countByOfficer[helperName] = {
         normal: 0,
         take2: 0,
         orange_red: 0,
         store: 0,
         total: 0
-        };
-        }
+      };
+    }
 
-        countByOfficer[officerName][c.type]++;
-        countByOfficer[officerName].total++;
+    countByOfficer[helperName][c.type]++;
+    countByOfficer[helperName].total++;
+  }
+}
 
 
       /* ---------- Weekly ---------- */
@@ -970,7 +1037,11 @@ if (i.isUserSelectMenu() && i.customId === 'select_user_to_check') {
   const targetMember = await i.guild.members.fetch(targetUserId);
 
   const cases = loadCases();
-  const userCases = cases.filter(c => c.officer === targetUserId);
+const userCases = cases.filter(c =>
+  c.officer === targetUserId ||
+  c.helpers?.includes(targetUserId)
+);
+
 
   const count = {
     normal: 0,
@@ -995,7 +1066,7 @@ if (i.isUserSelectMenu() && i.customId === 'select_user_to_check') {
       { name: '📁 คดีปกติ', value: `${count.normal}`, inline: true },
       { name: '✌️ Take2', value: `${count.take2}`, inline: true },
       { name: '🔴 คดีส้ม-แดง', value: `${count.orange_red}`, inline: true },
-      { name: '🏪 วังร้าน', value: `${count.store}`, inline: true },
+      { name: '🏪 งัดร้าน', value: `${count.store}`, inline: true },
       { name: '📊 รวมทั้งหมด', value: `${userCases.length}` }
     )
     .setFooter({ text: `ID: ${targetUserId}` });
