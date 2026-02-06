@@ -33,20 +33,12 @@ const {
   ButtonBuilder,
   ButtonStyle,
   ChannelType,
-  PermissionFlagsBits,
-  EmbedBuilder,
-  ModalBuilder,
-  TextInputBuilder,
-  TextInputStyle,
-  UserSelectMenuBuilder
+  PermissionFlagsBits
 } = require('discord.js');
 
-const sqlite3 = require('sqlite3').verbose();
 const fs = require('fs');
 const path = require('path');
-const XLSX = require('xlsx');
 
-const getDutyRows = require('./duty/exportDutyExcel');
 const dutyListener = require('./duty/dutyListener');
 
 /* ================= CLIENT ================= */
@@ -69,26 +61,6 @@ for (const file of fs.readdirSync(commandsPath).filter(f => f.endsWith('.js'))) 
   client.commands.set(command.data.name, command);
 }
 
-/* ================= DATA ================= */
-const DATA_PATH = path.join(__dirname, 'data/cases.json');
-
-function loadCases() {
-  if (!fs.existsSync(DATA_PATH)) return [];
-  return JSON.parse(fs.readFileSync(DATA_PATH, 'utf8')).cases || [];
-}
-
-function saveCases(cases) {
-  fs.writeFileSync(DATA_PATH, JSON.stringify({ cases }, null, 2));
-}
-
-function getThaiISOString() {
-  const now = new Date();
-  const thaiTime = new Date(
-    now.toLocaleString('en-US', { timeZone: 'Asia/Bangkok' })
-  );
-  return thaiTime.toISOString();
-}
-
 /* ================= MEMORY ================= */
 const caseRooms = new Map();
 
@@ -97,27 +69,27 @@ client.once(Events.ClientReady, () => {
   console.log(`✅ Logged in as ${client.user.tag}`);
 });
 
-/* ================= CREATE CASE CHANNEL (REAL FIX) ================= */
+/* ================= CREATE CASE CHANNEL (FINAL FIX) ================= */
 async function createCaseChannel(interaction, caseType) {
-  try {
-    const guild = interaction.guild;
-    const user = interaction.user;
+  const guild = interaction.guild;
+  const user = interaction.user;
 
+  try {
     const category = await guild.channels.fetch(CASE_CATEGORY_ID);
     if (!category || category.type !== ChannelType.GuildCategory) {
       return interaction.editReply('❌ ไม่พบหมวดคดี');
     }
 
-    // ✅ 1) สร้างห้องก่อน (ยังไม่ผูกหมวด)
+    // 1) สร้างห้อง (ยังไม่ผูกหมวด)
     const channel = await guild.channels.create({
       name: `📁-คดี-${user.username}`,
       type: ChannelType.GuildText
     });
 
-    // ✅ 2) ผูกหมวดทีหลัง (สำคัญมาก)
+    // 2) ผูกหมวด
     await channel.setParent(category.id);
 
-    // ✅ 3) ตั้ง permission
+    // 3) ตั้ง permission
     await channel.permissionOverwrites.set([
       {
         id: guild.roles.everyone.id,
@@ -160,18 +132,29 @@ async function createCaseChannel(interaction, caseType) {
         .setStyle(ButtonStyle.Danger)
     );
 
+    // ✅ ตอบ interaction ให้จบก่อน
     await interaction.editReply(`✅ สร้างห้อง ${channel} ในหมวดเรียบร้อย`);
-    await channel.send({
-      content:
-        `👤 เจ้าของห้อง: <@${user.id}>\n` +
-        `📂 ประเภทคดี: ${caseType}\n\n` +
-        `📸 กรุณาส่งรูปหลักฐาน\n🏷️ แท็กผู้ช่วย`,
-      components: [row]
-    });
+
+    // ⏳ หน่วงเวลาให้ Discord sync permission ก่อนส่งข้อความ
+    setTimeout(async () => {
+      try {
+        await channel.send({
+          content:
+            `👤 เจ้าของห้อง: <@${user.id}>\n` +
+            `📂 ประเภทคดี: ${caseType}\n\n` +
+            `📸 กรุณาส่งรูปหลักฐาน\n🏷️ แท็กผู้ช่วย`,
+          components: [row]
+        });
+      } catch (sendErr) {
+        console.error('SEND MESSAGE ERROR:', sendErr);
+      }
+    }, 1000);
 
   } catch (err) {
     console.error('CREATE CASE CHANNEL ERROR:', err);
-    await interaction.editReply('❌ สร้างห้องไม่สำเร็จ');
+    if (interaction.deferred || interaction.replied) {
+      await interaction.editReply('❌ สร้างห้องไม่สำเร็จ');
+    }
   }
 }
 
