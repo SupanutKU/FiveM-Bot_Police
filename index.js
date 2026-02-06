@@ -17,7 +17,8 @@ const APPROVE_CHANNEL_ID = '1461296754916851889';
 const CASE_LEADER_ROLE_ID = '1464250545924739207';
 const ALLOWED_ROLES = [
   '1461318666741092495',
-  '1464250545924739207'
+  '1464250545924739207',
+  '1461296754916851889'
 ];
 const CASE_CATEGORY_ID = '1461297109088075947';
 
@@ -159,72 +160,70 @@ async function createCaseChannel(interaction, caseType) {
     }
 
     // 2️⃣ สร้างห้อง (จบตรงนี้ถือว่าสำเร็จแล้ว)
-    const channel = await guild.channels.create({
-      name: `📁-คดี-${user.username}`,
-      type: ChannelType.GuildText,
-      parent: category.id,
-      permissionOverwrites: [
-        {
-          id: guild.roles.everyone.id,
-          deny: [PermissionFlagsBits.ViewChannel]
-        },
-        {
-          id: user.id,
-          allow: [
-            PermissionFlagsBits.ViewChannel,
-            PermissionFlagsBits.SendMessages,
-            PermissionFlagsBits.ReadMessageHistory
-          ]
-        },
-        {
-          id: CASE_LEADER_ROLE_ID,
-          allow: [
-            PermissionFlagsBits.ViewChannel,
-            PermissionFlagsBits.SendMessages,
-            PermissionFlagsBits.ReadMessageHistory
-          ]
-        }
+   const channel = await guild.channels.create({
+  name: `📁-คดี-${user.username}`,
+  type: ChannelType.GuildText,
+  parent: category.id,
+  permissionOverwrites: [
+    {
+      id: guild.roles.everyone.id,
+      deny: [PermissionFlagsBits.ViewChannel]
+    },
+    {
+      id: user.id,
+      allow: [
+        PermissionFlagsBits.ViewChannel,
+        PermissionFlagsBits.SendMessages,
+        PermissionFlagsBits.ReadMessageHistory
       ]
-    });
-
-    // 3️⃣ บันทึก memory
-    caseRooms.set(channel.id, {
-      ownerId: user.id,
-      caseType,
-      hasImage: false,
-      imageUrl: null,
-      tagged: new Map()
-    });
-
-    // 4️⃣ ตอบ interaction (สำเร็จจริง)
-    await interaction.editReply({
-      content: `✅ สร้างห้อง ${channel} เรียบร้อยแล้ว`,
-      ephemeral: true
-    });
-
-    // 5️⃣ ส่งข้อความในห้อง (แยก try กันพัง)
-    try {
-      const row = new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-          .setCustomId('submit_case')
-          .setLabel('📨 ส่งคดี')
-          .setStyle(ButtonStyle.Success),
-        new ButtonBuilder()
-          .setCustomId('delete_case')
-          .setLabel('🗑 ลบห้อง')
-          .setStyle(ButtonStyle.Danger)
-      );
-
-      await channel.send({
-        content:
-          `👤 เจ้าของห้อง: <@${user.id}>\n` +
-          `📂 ประเภทคดี: ${caseType}\n\n` +
-          `📸 กรุณาส่งรูปหลักฐาน\n🏷️ แท็กผู้ช่วย`,
-        components: [row]
-      });
-    } catch (msgErr) {
-      console.warn('SEND MESSAGE FAIL:', msgErr);
+    },
+    {
+      id: CASE_LEADER_ROLE_ID,
+      allow: [
+        PermissionFlagsBits.ViewChannel,
+        PermissionFlagsBits.SendMessages,
+        PermissionFlagsBits.ReadMessageHistory
+      ]
     }
+  ]
+});
+
+/* 🔴 สำคัญมาก */
+const readyChannel = await guild.channels.fetch(channel.id);
+caseRooms.set(readyChannel.id, {
+  ownerId: user.id,
+  caseType,
+  tagged: new Map(),
+  hasImage: false,
+  imageUrl: null
+});
+
+
+await readyChannel.send({
+  content:
+    `👤 เจ้าของห้อง: <@${user.id}>\n` +
+    `📂 ประเภทคดี: ${caseType}\n\n` +
+    `📸 กรุณาส่งรูปหลักฐาน\n🏷️ แท็กผู้ช่วย`
+});
+const row = new ActionRowBuilder().addComponents(
+  new ButtonBuilder()
+    .setCustomId('submit_case')
+    .setLabel('📨 ส่งคดี')
+    .setStyle(ButtonStyle.Success),
+
+  new ButtonBuilder()
+    .setCustomId('delete_case')
+    .setLabel('🗑 ลบห้อง')
+    .setStyle(ButtonStyle.Danger)
+);
+
+await readyChannel.send({
+  content:
+    `👤 เจ้าของห้อง: <@${user.id}>\n` +
+    `📂 ประเภทคดี: ${caseType}\n\n` +
+    `📸 กรุณาส่งรูปหลักฐาน\n🏷️ แท็กผู้ช่วย`,
+  components: [row]
+});
 
   } catch (err) {
     console.error('CREATE CASE ERROR:', err);
