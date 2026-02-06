@@ -158,6 +158,16 @@ client.once(Events.ClientReady, () => {
 });
 
 /* ================= CREATE CASE CHANNEL ================= */
+function getCaseNameTH(type) {
+  switch (type) {
+    case 'normal': return 'คดีปกติ';
+    case 'take2': return 'take2';
+    case 'orange_red': return 'ส้ม-แดง';
+    case 'store': return 'งัดร้าน';
+    default: return 'คดี';
+  }
+}
+
 async function createCaseChannel(interaction, caseType) {
   const guild = interaction.guild;
   const user = interaction.user;
@@ -167,25 +177,17 @@ async function createCaseChannel(interaction, caseType) {
     return interaction.editReply('❌ ไม่พบหมวดตำรวจ');
   }
 
-  // ✅ ใช้ชื่อเล่นในเซิร์ฟ
-  const member = await guild.members.fetch(user.id);
-  const displayName = member.displayName;
-
-  // ✅ ชื่อคดีจากที่กดเลือก
   const caseName = getCaseNameTH(caseType);
 
-  // ✅ ชื่อห้องสุดท้าย
-  const channelName = `🚓-${caseName}-${displayName}`;
-
   const channel = await guild.channels.create({
-    name: channelName,
+    name: `คดี-${caseName}-${user.username}`,
     type: ChannelType.GuildText,
-    parent: policeCategory.id, // อยู่หมวด POLICE แน่นอน
-
+    parent: policeCategory.id,
     permissionOverwrites: [
       {
         id: guild.id,
-        deny: [PermissionsBitField.Flags.ViewChannel],
+        allow: [PermissionsBitField.Flags.ViewChannel],
+        deny: [PermissionsBitField.Flags.SendMessages],
       },
       {
         id: user.id,
@@ -197,21 +199,25 @@ async function createCaseChannel(interaction, caseType) {
     ],
   });
 
-  caseRooms.set(channel.id, {
-    ownerId: user.id,
-    hasImage: false,
-    imageUrl: null,
-    tagged: new Map(),
-    caseType
+  // ✅ ตรงนี้คือหัวใจ (ก่อนหน้านี้ไม่ทำงาน)
+  await channel.send({
+    embeds: [
+      new EmbedBuilder()
+        .setTitle(`📁 ${caseName}`)
+        .setDescription('กดปุ่มด้านล่างเพื่อส่งเคส')
+        .setColor(0xff8800)
+    ],
+    components: [
+      new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+          .setCustomId('send_case')
+          .setLabel('📤 ส่งเคส')
+          .setStyle(ButtonStyle.Primary)
+      )
+    ]
   });
 
   await interaction.editReply(`✅ สร้างห้อง ${channel} เรียบร้อย`);
-
-  await channel.send({
-    content:
-      `👤 เจ้าของคดี: <@${user.id}>\n` +
-      `📂 ประเภทคดี: ${caseName}`,
-  });
 }
 
 /* ================= MESSAGE TRACK ================= */
