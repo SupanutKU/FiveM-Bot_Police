@@ -151,53 +151,72 @@ async function createCaseChannel(interaction, caseType) {
   const user = interaction.user;
 
   const CATEGORY_ID = '1461297109088075947';
-function getCaseNameTH(type) {
-  switch (type) {
-    case 'normal': return 'คดีปกติ';
-    case 'take2': return 'take2';
-    case 'orange_red': return 'ส้ม-แดง';
-    case 'store': return 'งัดร้าน';
-    default: return 'คดี';
+  const POLICE_ROLE_ID = '1461296754916851889'; // 👮‍♂️ police
+
+  function getCaseNameTH(type) {
+    switch (type) {
+      case 'normal': return 'คดีปกติ';
+      case 'take2': return 'take2';
+      case 'orange_red': return 'ส้ม-แดง';
+      case 'store': return 'งัดร้าน';
+      default: return 'คดี';
+    }
   }
-}
-const caseName = getCaseNameTH(caseType);
+
+  const caseName = getCaseNameTH(caseType);
   let channel;
+
   try {
     channel = await guild.channels.create({
-  name: `คดี-${caseName}-${user.username}`,
-  type: ChannelType.GuildText,
-  parent: CATEGORY_ID,
-  lockPermissions: false,
-  permissionOverwrites: [
-    {
-      id: guild.roles.everyone.id,
-      deny: [
-        PermissionFlagsBits.ViewChannel,
-        PermissionFlagsBits.SendMessages
-      ]
-    },
-    {
-      id: client.user.id, // 🔥 FIX HERE
-      allow: [
-        PermissionFlagsBits.ViewChannel,
-        PermissionFlagsBits.SendMessages,
-        PermissionFlagsBits.ReadMessageHistory,
-        PermissionFlagsBits.AttachFiles,
-        PermissionFlagsBits.EmbedLinks
-      ]
-    },
-    {
-      id: user.id,
-      allow: [
-        PermissionFlagsBits.ViewChannel,
-        PermissionFlagsBits.SendMessages,
-        PermissionFlagsBits.ReadMessageHistory,
-        PermissionFlagsBits.AttachFiles
-      ]
-    }
-  ]
-});
+      name: `คดี-${caseName}-${user.username}`,
+      type: ChannelType.GuildText,
+      parent: CATEGORY_ID,
+      lockPermissions: false,
+      permissionOverwrites: [
+        // ❌ ทุกคนไม่เห็น
+        {
+          id: guild.roles.everyone.id,
+          deny: [
+            PermissionFlagsBits.ViewChannel,
+            PermissionFlagsBits.SendMessages
+          ]
+        },
 
+        // 👮‍♂️ police เห็น + พิมพ์ได้
+        {
+          id: POLICE_ROLE_ID,
+          allow: [
+            PermissionFlagsBits.ViewChannel,
+            PermissionFlagsBits.SendMessages,
+            PermissionFlagsBits.ReadMessageHistory,
+            PermissionFlagsBits.AttachFiles
+          ]
+        },
+
+        // 🤖 bot
+        {
+          id: interaction.client.user.id,
+          allow: [
+            PermissionFlagsBits.ViewChannel,
+            PermissionFlagsBits.SendMessages,
+            PermissionFlagsBits.ReadMessageHistory,
+            PermissionFlagsBits.AttachFiles,
+            PermissionFlagsBits.EmbedLinks
+          ]
+        },
+
+        // 👤 เจ้าของคดี
+        {
+          id: user.id,
+          allow: [
+            PermissionFlagsBits.ViewChannel,
+            PermissionFlagsBits.SendMessages,
+            PermissionFlagsBits.ReadMessageHistory,
+            PermissionFlagsBits.AttachFiles
+          ]
+        }
+      ]
+    });
 
   } catch (e) {
     console.error('CREATE CHANNEL FAIL:', e);
@@ -227,22 +246,22 @@ const caseName = getCaseNameTH(caseType);
 
   await channel.send({
     content:
-      `สวัสดี <@${user.id}>!  
-คุณสามารถพิมพ์และอัปโหลดรูปในห้องนี้ได้คนเดียว  
-*(ยกเว้นแอดมิน / เลขา / ผู้กำกับ ที่พิมพ์ได้อย่างเดียว)*
+`สวัสดี <@${user.id}>!
+คุณสามารถพิมพ์และอัปโหลดรูปในห้องนี้ได้คนเดียว
+*(ยกเว้นแอดมิน / AGENCY)*
 
-⏰ **จำกัดเวลา:** 30 นาที  
+⏰ **จำกัดเวลา:** 30 นาที
 📸 **ต้องมีรูปภาพภายในเวลาที่กำหนด**
 
 > อัปโหลดรูปภาพ, Tag (@) ผู้ช่วยเหลือ, จากนั้นกด **ส่งคดี**
 
 ⚠️ **คำเตือน: หากเกินเวลา 30 นาที**
-❌ ไม่มีรูปภาพ: ห้องจะถูกลบอัตโนมัติ  
-✅ มีรูปภาพ: จะส่งคดีอัตโนมัติและลบห้อง
-`,
+❌ ไม่มีรูปภาพ: ห้องจะถูกลบอัตโนมัติ
+✅ มีรูปภาพ: จะส่งคดีอัตโนมัติและลบห้อง`,
     components: [row]
   });
 }
+
 
 /* ================= MESSAGE TRACK ================= */
 client.on(Events.MessageCreate, msg => {
