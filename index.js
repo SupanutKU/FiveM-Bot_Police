@@ -19,6 +19,17 @@ const ALLOWED_ROLES = [
   '1461318666741092495',
   '1464250545924739207',
 ];
+const POLICE_CATEGORY_ID = "1461297109088075947"; // ID หมวด POLICE
+function getCaseNameTH(type) {
+  switch (type) {
+    case 'normal': return 'คดีปกติ';
+    case 'take2': return 'take2';
+    case 'orange_red': return 'ส้ม-แดง';
+    case 'store': return 'งัดร้าน';
+    default: return 'คดี';
+  }
+}
+
 
 /* ================= DISCORD ================= */
 const {
@@ -29,13 +40,14 @@ const {
   ButtonBuilder,
   ButtonStyle,
   ChannelType,
-  PermissionFlagsBits,
+  PermissionsBitField,   // ← ใช้ตัวนี้
   EmbedBuilder,
   ModalBuilder,
   TextInputBuilder,
   TextInputStyle,
   UserSelectMenuBuilder
 } = require('discord.js');
+
 
 const { dutyExportButton } = require('./interactions/buttons');
 const sqlite3 = require('sqlite3').verbose();
@@ -150,12 +162,39 @@ async function createCaseChannel(interaction, caseType) {
   const guild = interaction.guild;
   const user = interaction.user;
 
+  const policeCategory = guild.channels.cache.get(POLICE_CATEGORY_ID);
+  if (!policeCategory || policeCategory.type !== ChannelType.GuildCategory) {
+    return interaction.editReply('❌ ไม่พบหมวดตำรวจ');
+  }
+
+  // ✅ ใช้ชื่อเล่นในเซิร์ฟ
+  const member = await guild.members.fetch(user.id);
+  const displayName = member.displayName;
+
+  // ✅ ชื่อคดีจากที่กดเลือก
+  const caseName = getCaseNameTH(caseType);
+
+  // ✅ ชื่อห้องสุดท้าย
+  const channelName = `🚓-${caseName}-${displayName}`;
+
   const channel = await guild.channels.create({
-    name: `📁-คดี-${user.username}`,
+    name: channelName,
     type: ChannelType.GuildText,
+    parent: policeCategory.id, // อยู่หมวด POLICE แน่นอน
+
     permissionOverwrites: [
-      { id: guild.roles.everyone, allow: [PermissionFlagsBits.ViewChannel] }
-    ]
+      {
+        id: guild.id,
+        deny: [PermissionsBitField.Flags.ViewChannel],
+      },
+      {
+        id: user.id,
+        allow: [
+          PermissionsBitField.Flags.ViewChannel,
+          PermissionsBitField.Flags.SendMessages,
+        ],
+      },
+    ],
   });
 
   caseRooms.set(channel.id, {
@@ -166,24 +205,12 @@ async function createCaseChannel(interaction, caseType) {
     caseType
   });
 
-  const row = new ActionRowBuilder().addComponents(
-    new ButtonBuilder()
-      .setCustomId('submit_case')
-      .setLabel('📨 ส่งคดี')
-      .setStyle(ButtonStyle.Success),
-    new ButtonBuilder()
-      .setCustomId('delete_case')
-      .setLabel('🗑 ลบห้อง')
-      .setStyle(ButtonStyle.Danger)
-  );
-
   await interaction.editReply(`✅ สร้างห้อง ${channel} เรียบร้อย`);
+
   await channel.send({
     content:
-      `👤 เจ้าของห้อง: <@${user.id}>\n` +
-      `📂 ประเภทคดี: ${caseType}\n\n` +
-      `📸 ต้องส่งรูปก่อน\n🏷️ แท็กผู้ช่วย`,
-    components: [row]
+      `👤 เจ้าของคดี: <@${user.id}>\n` +
+      `📂 ประเภทคดี: ${caseName}`,
   });
 }
 
@@ -227,9 +254,10 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
     /* ===== CREATE CASE ===== */
     if (caseMap[i.customId]) {
-      await i.deferReply({ ephemeral: true });
-      return createCaseChannel(i, caseMap[i.customId]);
-    }
+  await safeReply(i, { content: '⏳ กำลังสร้างห้อง...', ephemeral: true });
+  return createCaseChannel(i, caseMap[i.customId]);
+}
+
     /* ===== SUBMIT CASE (PREVIEW) ===== */
 if (i.isButton() && i.customId === 'submit_case') {
   await i.deferUpdate();
