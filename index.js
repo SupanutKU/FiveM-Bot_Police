@@ -12,12 +12,12 @@ app.listen(process.env.PORT || 3000, () => {
 });
 
 /* ================= CONFIG ================= */
-const LOG_CHANNEL_ID = '1464986343938593021';
-const APPROVE_CHANNEL_ID = '1464986705516822560';
-const CASE_LEADER_ROLE_ID = '1450344680670887987';
+const LOG_CHANNEL_ID = '1469342649319162081';
+const APPROVE_CHANNEL_ID = '1469342758668992594';
+const CASE_LEADER_ROLE_ID = '1464250545924739207';
 const ALLOWED_ROLES = [
-  '1450345959589412936',
-  '1450344680670887987'
+  '1461318666741092495',
+  '1464250545924739207',
 ];
 
 /* ================= DISCORD ================= */
@@ -37,7 +37,6 @@ const {
   UserSelectMenuBuilder
 } = require('discord.js');
 
-const { dutyExportButton } = require('./interactions/buttons');
 const exportDutyExcel = require('./duty/exportDutyExcel');
 const sqlite3 = require('sqlite3').verbose();
 const fs = require('fs');
@@ -782,13 +781,6 @@ if (interaction.isButton() && interaction.customId === 'export_excel') {
     }
 
     const workbook = XLSX.utils.book_new();
-// ===== EXPORT DUTY DB =====
-let dutyFilePath = null;
-try {
-  dutyFilePath = await exportDutyExcel();
-} catch (e) {
-  console.warn('ไม่มีข้อมูล duty หรือ export ไม่ได้:', e.message);
-}
 
     /* ================= GROUP DATA ================= */
     const groupedByType = {
@@ -929,17 +921,10 @@ try {
     const filePath = path.join(__dirname, `cases-${Date.now()}.xlsx`);
     XLSX.writeFile(workbook, filePath);
 
-    const files = [filePath];
-
-if (dutyFilePath) {
-  files.push(dutyFilePath);
-}
-
-await interaction.editReply({
-  content: '📊 สรุปเคสทั้งหมด + เวร (DB)',
-  files
-});
-
+    await interaction.editReply({
+      content: '📊 สรุปเคสครบทุกมุม (แยก Sheet + Dashboard)',
+      files: [filePath]
+    });
 
     setTimeout(() => {
       if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
@@ -1077,7 +1062,9 @@ function exportDutyExcel() {
 
   }
 });
-
+exportDutyExcel()
+  .then(file => console.log('📊 Export สำเร็จ:', file))
+  .catch(err => console.error('❌ Export ล้มเหลว:', err.message));
 /* ================= LOGIN ================= */
 if (!process.env.DISCORD_TOKEN) {
   console.error('❌ DISCORD_TOKEN is missing!');
