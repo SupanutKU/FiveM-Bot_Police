@@ -118,6 +118,20 @@ function getThisWeekRange() {
   return { start, end };
 }
 
+function formatThaiTime(dateInput) {
+  const date = new Date(dateInput);
+
+  return new Intl.DateTimeFormat('th-TH', {
+    timeZone: 'Asia/Bangkok',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false
+  }).format(date);
+}
 
 function parseThaiDate(str) {
   if (!str || typeof str !== 'string') return null;
@@ -254,16 +268,31 @@ if (i.isButton() && i.customId === 'submit_case') {
     room.tagged.size > 0
       ? [...room.tagged.keys()].map(id => `<@${id}>`).join(', ')
       : 'ไม่มี';
+function formatThaiNow(timestamp = Date.now()) {
+  return new Intl.DateTimeFormat('th-TH', {
+    timeZone: 'Asia/Bangkok',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false
+  }).format(new Date(timestamp));
+}
 
-  const embed = new EmbedBuilder()
-    .setColor(0xf1c40f)
-    .setTitle('📋 ตรวจทานข้อมูลคดี')
-    .addFields(
-      { name: '📂 ประเภทคดี', value: room.caseType, inline: true },
-      { name: '👮 คนลงคดี', value: `<@${room.ownerId}>`, inline: true },
-      { name: '🛠 ผู้ช่วย', value: helpers },
-      { name: '🕒 เวลา', value: new Date().toLocaleString('th-TH') }
-    )
+const thaiTimeText = formatThaiNow(i.createdTimestamp);
+
+const embed = new EmbedBuilder()
+  .setColor(0xf1c40f)
+  .setTitle('📋 ตรวจทานข้อมูลคดี')
+  .addFields(
+    { name: '📂 ประเภทคดี', value: room.caseType, inline: true },
+    { name: '👮 คนลงคดี', value: `<@${room.ownerId}>`, inline: true },
+    { name: '🛠 ผู้ช่วย', value: helpers },
+    { name: '🕒 เวลา', value: thaiTimeText }
+  )
+
     .setImage(room.imageUrl)
     .setFooter({ text: 'กรุณาตรวจสอบก่อนยืนยันส่งคดี' });
 
@@ -304,7 +333,8 @@ if (i.isButton() && i.customId === 'confirm_submit') {
     officer: room.ownerId,
     type: room.caseType,
     helpers: [...room.tagged.keys()],
-    createdAt: getThaiISOString(),
+    createdAt: new Date().toISOString(), // UTC มาตรฐาน
+
     imageUrl: room.imageUrl
   };
 
@@ -312,16 +342,27 @@ if (i.isButton() && i.customId === 'confirm_submit') {
     newCase.helpers.length > 0
       ? newCase.helpers.map(id => `<@${id}>`).join(', ')
       : 'ไม่มี';
+const thaiTimeText = new Date().toLocaleString('th-TH', {
+  timeZone: 'Asia/Bangkok',
+  year: 'numeric',
+  month: 'numeric',
+  day: 'numeric',
+  hour: '2-digit',
+  minute: '2-digit',
+  second: '2-digit'
+});
 
   const embed = new EmbedBuilder()
     .setColor(0x2ecc71)
     .setTitle('✅ บันทึกการส่งคดี')
     .setDescription(
-      `📁 คดี-${newCase.type}-${newCase.id}\n\n` +
-      `👮 คนลงคดี\n<@${newCase.officer}>\n\n` +
-      `🛠 ผู้ช่วย\n${helpersText}\n\n` +
-      `🕒 เวลา\n${new Date().toLocaleString('th-TH')}`
-    )
+  `📁 คดี-${newCase.type}-${newCase.id}\n\n` +
+  `👮 คนลงคดี\n<@${newCase.officer}>\n\n` +
+  `🛠 ผู้ช่วย\n${helpersText}\n\n` +
+  `🕒 เวลา\n${thaiTimeText}`
+)
+
+
     .setImage(newCase.imageUrl)
     .setFooter({ text: 'ระบบ Bot Police' });
 
@@ -861,7 +902,7 @@ if (interaction.isButton() && interaction.customId === 'export_excel') {
         เลขคดี: `คดี-${c.type}-${c.id}`,
         คนลงคดี: officerName,
         ผู้ช่วยเหลือ: helperNames,
-        วันที่บันทึก: created.toLocaleString('th-TH'),
+        วันที่บันทึก: formatThaiTime(created),
         ลิงก์คดี: `https://discord.com/channels/${interaction.guild.id}/${LOG_CHANNEL_ID}/${c.logMessageId}`
       });
 
