@@ -132,8 +132,6 @@ function parseThaiDate(str) {
   return new Date(y - 543, m - 1, d);
 }
 
-
-
 function saveCases(cases) {
   fs.writeFileSync(DATA_PATH, JSON.stringify({ cases }, null, 2));
 }
@@ -152,41 +150,42 @@ async function createCaseChannel(interaction, caseType) {
     const guild = interaction.guild;
     const user = interaction.user;
 
-    const category = guild.channels.cache.get(CASE_CATEGORY_ID);
+    const category = await guild.channels.fetch(CASE_CATEGORY_ID);
     if (!category || category.type !== ChannelType.GuildCategory) {
       return interaction.editReply('❌ ไม่พบหมวดคดี');
     }
 
-    // 1️⃣ สร้างห้องก่อน (ยังไม่ย้ายหมวด)
+    // 1️⃣ สร้างห้องในหมวดก่อน โดย "ไม่กำหนด permission"
     const channel = await guild.channels.create({
       name: `📁-คดี-${user.username}`,
       type: ChannelType.GuildText,
-      permissionOverwrites: [
-        {
-          id: guild.roles.everyone.id,
-          deny: [PermissionFlagsBits.ViewChannel]
-        },
-        {
-          id: user.id,
-          allow: [
-            PermissionFlagsBits.ViewChannel,
-            PermissionFlagsBits.SendMessages,
-            PermissionFlagsBits.ReadMessageHistory
-          ]
-        },
-        {
-          id: CASE_LEADER_ROLE_ID,
-          allow: [
-            PermissionFlagsBits.ViewChannel,
-            PermissionFlagsBits.SendMessages,
-            PermissionFlagsBits.ReadMessageHistory
-          ]
-        }
-      ]
+      parent: CASE_CATEGORY_ID,
+      permissionOverwrites: [] // 🔥 สำคัญมาก
     });
 
-    // 2️⃣ ย้ายเข้าหมวด (จุดนี้คือหัวใจ)
-    await channel.setParent(CASE_CATEGORY_ID, { lockPermissions: false });
+    // 2️⃣ ค่อย set permission ทีหลัง
+    await channel.permissionOverwrites.set([
+      {
+        id: guild.roles.everyone.id,
+        deny: [PermissionFlagsBits.ViewChannel]
+      },
+      {
+        id: user.id,
+        allow: [
+          PermissionFlagsBits.ViewChannel,
+          PermissionFlagsBits.SendMessages,
+          PermissionFlagsBits.ReadMessageHistory
+        ]
+      },
+      {
+        id: CASE_LEADER_ROLE_ID,
+        allow: [
+          PermissionFlagsBits.ViewChannel,
+          PermissionFlagsBits.SendMessages,
+          PermissionFlagsBits.ReadMessageHistory
+        ]
+      }
+    ]);
 
     caseRooms.set(channel.id, {
       ownerId: user.id,
@@ -221,7 +220,6 @@ async function createCaseChannel(interaction, caseType) {
     await interaction.editReply('❌ สร้างห้องไม่สำเร็จ');
   }
 }
-
 
 /* ================= MESSAGE TRACK ================= */
 client.on(Events.MessageCreate, msg => {
