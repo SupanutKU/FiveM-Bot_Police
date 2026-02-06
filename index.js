@@ -69,30 +69,25 @@ client.once(Events.ClientReady, () => {
   console.log(`✅ Logged in as ${client.user.tag}`);
 });
 
-/* ================= CREATE CASE CHANNEL (FINAL FIX) ================= */
+/* ================= CREATE CASE CHANNEL ================= */
 async function createCaseChannel(interaction, caseType) {
   const guild = interaction.guild;
   const user = interaction.user;
 
   try {
     const category = await guild.channels.fetch(CASE_CATEGORY_ID);
-    if (!category) {
-      return interaction.followUp({
-        content: '❌ ไม่พบหมวดคดี',
-        ephemeral: true
-      });
+    if (!category || category.type !== ChannelType.GuildCategory) {
+      return interaction.editReply('❌ ไม่พบหมวดคดี');
     }
 
-    // 1️⃣ สร้างห้อง
+    // ✅ สร้างห้องเข้าหมวดทันที (นิ่งสุด)
     const channel = await guild.channels.create({
       name: `📁-คดี-${user.username}`,
-      type: ChannelType.GuildText
+      type: ChannelType.GuildText,
+      parent: category.id
     });
 
-    // 2️⃣ ย้ายเข้าหมวด (วิธีนิ่งสุด)
-    await channel.setParent(category.id, { lockPermissions: false });
-
-    // 3️⃣ permission
+    // ✅ permission
     await channel.permissionOverwrites.set([
       {
         id: guild.roles.everyone.id,
@@ -121,13 +116,6 @@ async function createCaseChannel(interaction, caseType) {
       caseType
     });
 
-    // 4️⃣ แจ้งผู้ใช้ (ใช้ followUp เท่านั้น)
-    await interaction.followUp({
-      content: `✅ สร้างห้อง ${channel} เรียบร้อย`,
-      ephemeral: true
-    });
-
-    // 5️⃣ ส่งข้อความในห้อง
     const row = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
         .setCustomId('submit_case')
@@ -139,6 +127,8 @@ async function createCaseChannel(interaction, caseType) {
         .setStyle(ButtonStyle.Danger)
     );
 
+    await interaction.editReply(`✅ สร้างห้อง ${channel} เรียบร้อย`);
+
     await channel.send({
       content:
         `👤 เจ้าของห้อง: <@${user.id}>\n` +
@@ -149,23 +139,15 @@ async function createCaseChannel(interaction, caseType) {
 
   } catch (err) {
     console.error('CREATE CASE ERROR:', err);
-    await interaction.followUp({
-      content: '❌ เกิดข้อผิดพลาดระหว่างสร้างห้อง',
-      ephemeral: true
-    });
+    await interaction.editReply('❌ เกิดข้อผิดพลาดระหว่างสร้างห้อง');
   }
 }
-
-
 
 /* ================= INTERACTIONS ================= */
 client.on(Events.InteractionCreate, async interaction => {
   try {
-    if (interaction.isChatInputCommand()) {
-      const cmd = client.commands.get(interaction.commandName);
-      if (cmd) return cmd.execute(interaction);
-      return;
-    }
+    // 🔒 รับเฉพาะปุ่มเท่านั้น (กันชน dutyListener)
+    if (!interaction.isButton()) return;
 
     const caseMap = {
       case_normal: 'normal',
@@ -174,10 +156,11 @@ client.on(Events.InteractionCreate, async interaction => {
       case_store: 'store'
     };
 
-    if (caseMap[interaction.customId]) {
-      await interaction.deferReply({ ephemeral: true });
-      return createCaseChannel(interaction, caseMap[interaction.customId]);
-    }
+    const caseType = caseMap[interaction.customId];
+    if (!caseType) return;
+
+    await interaction.deferReply({ ephemeral: true });
+    await createCaseChannel(interaction, caseType);
 
   } catch (err) {
     console.error('INTERACTION ERROR:', err);
