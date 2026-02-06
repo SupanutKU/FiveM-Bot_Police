@@ -22,7 +22,6 @@ const ALLOWED_ROLES = [
   '1464250545924739207'
 ];
 
-// ✅ ใช้ตัวเดียวทั้งไฟล์
 const CASE_CATEGORY_ID = '1461297109088075947';
 
 /* ================= DISCORD ================= */
@@ -98,7 +97,7 @@ client.once(Events.ClientReady, () => {
   console.log(`✅ Logged in as ${client.user.tag}`);
 });
 
-/* ================= CREATE CASE CHANNEL (FIXED) ================= */
+/* ================= CREATE CASE CHANNEL (REAL FIX) ================= */
 async function createCaseChannel(interaction, caseType) {
   try {
     const guild = interaction.guild;
@@ -109,15 +108,16 @@ async function createCaseChannel(interaction, caseType) {
       return interaction.editReply('❌ ไม่พบหมวดคดี');
     }
 
-    // ✅ สร้างห้องเข้าหมวดทันที
+    // ✅ 1) สร้างห้องก่อน (ยังไม่ผูกหมวด)
     const channel = await guild.channels.create({
       name: `📁-คดี-${user.username}`,
-      type: ChannelType.GuildText,
-      parent: category.id,
-      permissionOverwrites: []
+      type: ChannelType.GuildText
     });
 
-    // ✅ ตั้ง permission ทีหลัง
+    // ✅ 2) ผูกหมวดทีหลัง (สำคัญมาก)
+    await channel.setParent(category.id);
+
+    // ✅ 3) ตั้ง permission
     await channel.permissionOverwrites.set([
       {
         id: guild.roles.everyone.id,
