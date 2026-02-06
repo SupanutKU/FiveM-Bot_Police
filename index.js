@@ -69,7 +69,7 @@ client.once(Events.ClientReady, () => {
   console.log(`✅ Logged in as ${client.user.tag}`);
 });
 
-/* ================= CREATE CASE CHANNEL (FINAL FIX) ================= */
+/* ================= CREATE CASE CHANNEL ================= */
 async function createCaseChannel(interaction, caseType) {
   const guild = interaction.guild;
   const user = interaction.user;
@@ -80,47 +80,44 @@ async function createCaseChannel(interaction, caseType) {
       return interaction.editReply('❌ ไม่พบหมวดคดี');
     }
 
-    // 1) สร้างห้อง (ยังไม่ผูกหมวด)
+    // ✅ สร้างห้อง + ผูกหมวด + permission ในครั้งเดียว
     const channel = await guild.channels.create({
       name: `📁-คดี-${user.username}`,
-      type: ChannelType.GuildText
+      type: ChannelType.GuildText,
+      parent: category.id,
+      permissionOverwrites: [
+        {
+          id: guild.roles.everyone.id,
+          deny: [PermissionFlagsBits.ViewChannel]
+        },
+        {
+          id: user.id,
+          allow: [
+            PermissionFlagsBits.ViewChannel,
+            PermissionFlagsBits.SendMessages,
+            PermissionFlagsBits.ReadMessageHistory
+          ]
+        },
+        {
+          id: CASE_LEADER_ROLE_ID,
+          allow: [
+            PermissionFlagsBits.ViewChannel,
+            PermissionFlagsBits.SendMessages,
+            PermissionFlagsBits.ReadMessageHistory
+          ]
+        }
+      ]
     });
-
-    // 2) ผูกหมวด
-    await channel.setParent(category.id);
-
-    // 3) ตั้ง permission
-    await channel.permissionOverwrites.set([
-      {
-        id: guild.roles.everyone.id,
-        deny: [PermissionFlagsBits.ViewChannel]
-      },
-      {
-        id: user.id,
-        allow: [
-          PermissionFlagsBits.ViewChannel,
-          PermissionFlagsBits.SendMessages,
-          PermissionFlagsBits.ReadMessageHistory
-        ]
-      },
-      {
-        id: CASE_LEADER_ROLE_ID,
-        allow: [
-          PermissionFlagsBits.ViewChannel,
-          PermissionFlagsBits.SendMessages,
-          PermissionFlagsBits.ReadMessageHistory
-        ]
-      }
-    ]);
 
     caseRooms.set(channel.id, {
       ownerId: user.id,
-      hasImage: false,
-      imageUrl: null,
-      tagged: new Map(),
       caseType
     });
 
+    // ✅ ตอบ interaction แค่นี้ถือว่าสำเร็จแล้ว
+    await interaction.editReply(`✅ สร้างห้อง ${channel} เรียบร้อย`);
+
+    // ✅ ส่งข้อความในห้อง (พังไม่ย้อน error)
     const row = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
         .setCustomId('submit_case')
@@ -132,27 +129,17 @@ async function createCaseChannel(interaction, caseType) {
         .setStyle(ButtonStyle.Danger)
     );
 
-    // ✅ ตอบ interaction ให้จบก่อน
-    await interaction.editReply(`✅ สร้างห้อง ${channel} ในหมวดเรียบร้อย`);
-
-    // ⏳ หน่วงเวลาให้ Discord sync permission ก่อนส่งข้อความ
-    setTimeout(async () => {
-      try {
-        await channel.send({
-          content:
-            `👤 เจ้าของห้อง: <@${user.id}>\n` +
-            `📂 ประเภทคดี: ${caseType}\n\n` +
-            `📸 กรุณาส่งรูปหลักฐาน\n🏷️ แท็กผู้ช่วย`,
-          components: [row]
-        });
-      } catch (sendErr) {
-        console.error('SEND MESSAGE ERROR:', sendErr);
-      }
-    }, 1000);
+    await channel.send({
+      content:
+        `👤 เจ้าของห้อง: <@${user.id}>\n` +
+        `📂 ประเภทคดี: ${caseType}\n\n` +
+        `📸 กรุณาส่งรูปหลักฐาน\n🏷️ แท็กผู้ช่วย`,
+      components: [row]
+    });
 
   } catch (err) {
     console.error('CREATE CASE CHANNEL ERROR:', err);
-    if (interaction.deferred || interaction.replied) {
+    if (!interaction.replied) {
       await interaction.editReply('❌ สร้างห้องไม่สำเร็จ');
     }
   }
