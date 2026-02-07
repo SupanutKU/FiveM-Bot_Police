@@ -69,11 +69,17 @@ const dutyListener = require('./duty/dutyListener');
 dutyListener(client);
 
 async function safeReply(interaction, options) {
-  if (interaction.replied || interaction.deferred) {
-    return interaction.followUp(options);
+  if (interaction.deferred) {
+    return interaction.editReply(options);
+  }
+  if (interaction.replied) {
+    // ❌ ห้ามส่ง ephemeral ใน followUp
+    const { ephemeral, ...rest } = options;
+    return interaction.followUp(rest);
   }
   return interaction.reply(options);
 }
+
 
 async function safeEdit(interaction, options) {
   if (interaction.replied || interaction.deferred) {
@@ -357,10 +363,11 @@ if (i.isButton() && i.customId === 'submit_case') {
   );
 
   return safeReply(i, {
-    content: '📤 กรุณายืนยันการส่งคดี',
-    components: [row],
-    ephemeral: true
-  });
+  content: '📤 กรุณายืนยันการส่งคดี',
+  components: [row],
+  ephemeral: true
+});
+
 }
 
 
@@ -551,7 +558,7 @@ if (i.customId === 'mycase_this_week') {
     .setFooter({ text: 'Bot Police • สรุปสัปดาห์อัตโนมัติ' })
     .setTimestamp();
 
-  return safeEdit(i, { embeds: [embed] });
+  return i.editReply({ embeds: [embed] });
 }
 /* เช็คเคสทั้งหมด*/
 /* ===== เช็คทั้งหมด ===== */
@@ -631,7 +638,7 @@ if (i.customId === 'mycase_all') {
     .setFooter({ text: 'Bot Police • สรุปเคสทั้งหมดอัตโนมัติ' })
     .setTimestamp();
 
-  return safeEdit(i, { embeds: [embed] });
+  return i.editReply({ embeds: [embed] });
 }
 
     /* ===== ADD HELPER BUTTON ===== */
@@ -1303,16 +1310,11 @@ function exportDutyExcel() {
 
   } catch (err) {
     console.error('INTERACTION ERROR:', err);
-    if (interaction.isRepliable()) {
+    if (interaction?.deferred) {
   try {
-    if (interaction.deferred || interaction.replied) {
-      await interaction.followUp({ content: '❌ เกิดข้อผิดพลาด', ephemeral: true });
-    } else {
-      await interaction.editReply({ content: '❌ เกิดข้อผิดพลาด', ephemeral: true });
-    }
+    await interaction.editReply({ content: '❌ เกิดข้อผิดพลาด' });
   } catch {}
 }
-
   }
 });
 exportDutyExcel()
