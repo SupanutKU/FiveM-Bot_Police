@@ -66,9 +66,17 @@ module.exports = {
         .setStyle(ButtonStyle.Secondary)
     );
 
-    await interaction.reply({
+    const payload = {
       content: 'เลือกปุ่มด้านล่างเพื่อดำเนินการ:',
-      components: [row1, row2, row3]
-    });
+      components: [row1, row2, row3],
+      ephemeral: true
+    };
+
+    // 🔐 ป้องกัน Interaction 40060
+    if (interaction.deferred || interaction.replied) {
+      await interaction.editReply(payload);
+    } else {
+      await interaction.reply(payload);
+    }
   }
 };

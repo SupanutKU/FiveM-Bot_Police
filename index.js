@@ -162,7 +162,13 @@ async function lockPoliceCategory(guild) {
 
   console.log('🔒 POLICE category locked');
 }
+client.on('error', err => {
+  console.error('DISCORD CLIENT ERROR:', err);
+});
 
+process.on('unhandledRejection', err => {
+  console.error('UNHANDLED REJECTION:', err);
+});
 /* ================= CREATE CASE CHANNEL ================= */
 async function createCaseChannel(interaction, caseType) {
   const guild = interaction.guild;
@@ -289,9 +295,6 @@ setInterval(async () => {
 
 client.on(Events.InteractionCreate, async (interaction) => { 
   try {
-    if (interaction.isButton() || interaction.isModalSubmit()) {
-  if (interaction.replied || interaction.deferred) return;
-}
     /* ===== SLASH ===== */
     if (interaction.isChatInputCommand()) {
       const cmd = client.commands.get(interaction.commandName);
@@ -319,21 +322,24 @@ client.on(Events.InteractionCreate, async (interaction) => {
 if (i.isButton() && i.customId === 'submit_case') {
   const room = caseRooms.get(i.channel.id);
   if (!room) {
-    return i.reply({ content: '❌ ห้องนี้ไม่ใช่ห้องคดี', ephemeral: true });
+    return safeReply(i, {
+      content: '❌ ห้องนี้ไม่ใช่ห้องคดี',
+      ephemeral: true
+    });
   }
 
   const isOwner = i.user.id === room.ownerId;
   const isHelper = room.tagged.has(i.user.id);
 
   if (!isOwner && !isHelper) {
-    return i.reply({
+    return safeReply(i, {
       content: '❌ เฉพาะเจ้าของคดีหรือผู้ช่วยเท่านั้น',
       ephemeral: true
     });
   }
 
   if (!room.hasImage) {
-    return i.reply({
+    return safeReply(i, {
       content: '❌ ต้องส่งรูปก่อนถึงจะส่งคดีได้',
       ephemeral: true
     });
@@ -350,12 +356,13 @@ if (i.isButton() && i.customId === 'submit_case') {
       .setStyle(ButtonStyle.Secondary)
   );
 
-  return i.reply({
+  return safeReply(i, {
     content: '📤 กรุณายืนยันการส่งคดี',
     components: [row],
     ephemeral: true
   });
 }
+
 
 /* ===== CONFIRM SUBMIT ===== */
 if (i.isButton() && i.customId === 'confirm_submit') {
