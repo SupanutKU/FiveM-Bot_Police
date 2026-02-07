@@ -69,19 +69,23 @@ const dutyListener = require('./duty/dutyListener');
 dutyListener(client);
 
 async function safeReply(interaction, options) {
-  if (interaction.replied || interaction.deferred) {
-    return interaction.followUp(options);
+  if (!interaction.isRepliable()) return;
+
+  if (interaction.deferred || interaction.replied) {
+    return safeReply(interaction, (options));
   }
-  return interaction.reply(options);
+  return safeReply(interaction,(options));
 }
 
 async function safeEdit(interaction, options) {
-  if (interaction.replied || interaction.deferred) {
-    return interaction.editReply(options);
-  } else {
-    return interaction.reply(options);
+  if (!interaction.isRepliable()) return;
+
+  if (interaction.deferred || interaction.replied) {
+    return safeReply(interaction,(options));
   }
+  return safeReply(interaction,(options));
 }
+
 
 /* ✅ FIX 1: INIT COMMANDS */
 client.commands = new Map();
@@ -313,19 +317,21 @@ client.on(Events.InteractionCreate, async (interaction) => {
     };
 
     /* ===== CREATE CASE ===== */
-    if (caseMap[i.customId]) {
-      await i.deferReply({ ephemeral: true });
-      return createCaseChannel(i, caseMap[i.customId]);
-    }
+ if (caseMap[i.customId]) {
+  // ❌ ไม่ defer ตรงนี้
+  return createCaseChannel(i, caseMap[i.customId]);
+}
+
 
     /* ===== SUBMIT CASE ===== */
 if (i.isButton() && i.customId === 'submit_case') {
+  if (!i.deferred && !i.replied) {
+    await i.deferReply({ ephemeral: true });
+  }
+
   const room = caseRooms.get(i.channel.id);
   if (!room) {
-    return safeReply(i, {
-      content: '❌ ห้องนี้ไม่ใช่ห้องคดี',
-      ephemeral: true
-    });
+    return i.editReply('❌ ห้องนี้ไม่ใช่ห้องคดี');
   }
 
   const isOwner = i.user.id === room.ownerId;
@@ -650,7 +656,7 @@ if (interaction.isButton() && interaction.customId === 'add_helper') {
     new ActionRowBuilder().addComponents(input)
   );
 
-  return interaction.showModal(modal);
+  return safeReply(interaction,(modal));
 }
 /* ===== ADD HELPER MODAL SUBMIT ===== */
 if (interaction.isModalSubmit() && interaction.customId === 'add_helper_modal') {
@@ -660,29 +666,31 @@ if (interaction.isModalSubmit() && interaction.customId === 'add_helper_modal') 
     /https?:\/\/(?:canary\.|ptb\.)?discord\.com\/channels\/\d+\/\d+\/(\d+)/
   );
 
-  if (!match) {
-    return interaction.reply({
-      content: '❌ ลิงก์ไม่ถูกต้อง',
-      ephemeral: true
-    });
+async function safeRespond(i, payload) {
+  if (i.deferred || i.replied) {
+    return i.editReply(payload);
   }
+  return i.reply(payload);
+}
+
 
   const messageId = match[1];
   const cases = loadCases();
   const targetCase = cases.find(c => c.logMessageId === messageId);
 
   if (!targetCase) {
-    return interaction.reply({
-      content: '❌ ไม่พบคดีนี้ในระบบ',
-      ephemeral: true
-    });
+    return safeReply(interaction, {
+  content: '❌ ไม่พบคดีนี้ในระบบ',
+  ephemeral: true
+});
+
   }
 
   const approveChannel =
     interaction.guild.channels.cache.get(APPROVE_CHANNEL_ID);
 
   if (!approveChannel) {
-    return interaction.reply({
+    return safeReply(interaction, {
       content: '❌ ไม่พบห้องอนุมัติ',
       ephemeral: true
     });
@@ -711,7 +719,7 @@ if (interaction.isModalSubmit() && interaction.customId === 'add_helper_modal') 
 
   await approveChannel.send({ embeds: [embed], components: [row] });
 
-  return interaction.reply({
+  return safeReply(interaction, {
     content: '📨 ส่งคำขอเพิ่มชื่อเรียบร้อยแล้ว',
     ephemeral: true
   });
@@ -728,7 +736,7 @@ if (
   const targetCase = cases.find(c => String(c.id) === caseId);
 
   if (!targetCase) {
-    return interaction.editReply('❌ ไม่พบคดีนี้');
+   return safeReply (interaction, ('❌ ไม่พบคดีนี้'));
   }
 
   /* ===== ADD HELPER ===== */
@@ -786,7 +794,7 @@ await logMessage.edit({ embeds: [embed] });
     components: []
   });
 
-  return interaction.editReply('✅ เพิ่มชื่อและอัปเดตคดีเรียบร้อย');
+  return safeReply(interaction, ('✅ เพิ่มชื่อและอัปเดตคดีเรียบร้อย'));
 }
 
 /* ===== REJECT ADD HELPER ===== */
@@ -805,7 +813,7 @@ if (
     )
   });
 
-  return interaction.editReply('❌ ปฏิเสธคำขอแล้ว');
+  return safeReply(interaction, ('❌ ปฏิเสธคำขอแล้ว'));
 }
 /* ===== EDIT CASE MODAL SUBMIT ===== */
 if (interaction.isButton() && interaction.customId === 'edit_case') {
@@ -823,7 +831,7 @@ if (interaction.isButton() && interaction.customId === 'edit_case') {
     new ActionRowBuilder().addComponents(input)
   );
 
-  return interaction.showModal(modal);
+  return safeReply(interaction,(modal));
 }
 if (interaction.isModalSubmit() && interaction.customId === 'edit_case_modal') {
   const link = interaction.fields.getTextInputValue('case_link');
@@ -832,7 +840,7 @@ if (interaction.isModalSubmit() && interaction.customId === 'edit_case_modal') {
     /discord\.com\/channels\/\d+\/\d+\/(\d+)/
   );
   if (!match) {
-    return interaction.reply({ content: '❌ ลิงก์ไม่ถูกต้อง', ephemeral: true });
+   return safeReply(interaction, { content: '❌ ลิงก์ไม่ถูกต้อง', ephemeral: true });
   }
 
   const messageId = match[1];
@@ -840,7 +848,7 @@ if (interaction.isModalSubmit() && interaction.customId === 'edit_case_modal') {
   const targetCase = cases.find(c => c.logMessageId === messageId);
 
   if (!targetCase) {
-    return interaction.reply({ content: '❌ ไม่พบคดีนี้', ephemeral: true });
+    return safeReply(interaction, { content: '❌ ไม่พบคดีนี้', ephemeral: true });
   }
 
   targetCase.editRequester = interaction.user.id;
@@ -851,7 +859,7 @@ if (interaction.isModalSubmit() && interaction.customId === 'edit_case_modal') {
     .setMinValues(1)
     .setMaxValues(10);
 
-  return interaction.reply({
+  return safeReply(interaction, {
     content: '🛠 เลือกผู้ช่วยใหม่',
     components: [new ActionRowBuilder().addComponents(select)],
     ephemeral: true
@@ -866,7 +874,7 @@ if (
   const targetCase = cases.find(c => String(c.id) === caseId);
 
   if (!targetCase) {
-    return interaction.reply({ content: '❌ ไม่พบคดี', ephemeral: true });
+    return safeReply(interaction, { content: '❌ ไม่พบคดี', ephemeral: true });
   }
 
   targetCase.pendingEdit = {
@@ -903,7 +911,7 @@ if (
 
   await approveChannel.send({ embeds: [embed], components: [row] });
 
-  return interaction.update({
+  return safeReply(interaction, {
     content: '📨 ส่งคำขอแก้ไขเรียบร้อย',
     components: []
   });
@@ -913,7 +921,7 @@ if (
   interaction.customId.startsWith('approve_edit_')
 ) {
   if (!interaction.member.roles.cache.has(CASE_LEADER_ROLE_ID)) {
-    return interaction.reply({ content: '❌ เฉพาะหัวหน้าคดี', ephemeral: true });
+   return safeReply(interaction, { content: '❌ เฉพาะหัวหน้าคดี', ephemeral: true });
   }
 
   const caseId = interaction.customId.split('_').pop();
@@ -921,7 +929,7 @@ if (
   const targetCase = cases.find(c => String(c.id) === caseId);
 
   if (!targetCase?.pendingEdit) {
-    return interaction.reply({ content: '❌ ไม่มีคำขอแก้ไข', ephemeral: true });
+    return safeReply(interaction, { content: '❌ ไม่มีคำขอแก้ไข', ephemeral: true });
   }
 
   /* APPLY EDIT */
@@ -951,10 +959,13 @@ if (
   await logMessage.edit({ embeds: [updatedEmbed] });
   await interaction.message.edit({ components: [] });
 
-  return interaction.reply({
-    content: '✅ อนุมัติและแก้ไขคดีเรียบร้อย',
-    ephemeral: true
-  });
+async function safeRespond(i, payload) {
+  if (i.deferred || i.replied) {
+    return i.editReply(payload);
+  }
+  return i.reply(payload);
+}
+
 }
 /* ===== EXPORT ALL CASES TO EXCEL (FULL VERSION) ===== */
 if (interaction.isButton() && interaction.customId === 'export_excel') {
@@ -963,7 +974,7 @@ if (interaction.isButton() && interaction.customId === 'export_excel') {
   try {
     const cases = loadCases();
     if (!cases.length) {
-      return interaction.editReply('❌ ยังไม่มีข้อมูลคดี');
+      return safeReply(interaction, ('❌ ยังไม่มีข้อมูลคดี'));
     }
 
     const workbook = XLSX.utils.book_new();
@@ -1304,13 +1315,16 @@ function exportDutyExcel() {
   } catch (err) {
     console.error('INTERACTION ERROR:', err);
     if (interaction.isRepliable()) {
-  try {
-    if (interaction.deferred || interaction.replied) {
-      await interaction.followUp({ content: '❌ เกิดข้อผิดพลาด', ephemeral: true });
-    } else {
-      await interaction.editReply({ content: '❌ เกิดข้อผิดพลาด', ephemeral: true });
-    }
-  } catch {}
+ if (!interaction.isRepliable()) return;
+
+try {
+  if (interaction.deferred || interaction.replied) {
+    await interaction.editReply({ content: '❌ เกิดข้อผิดพลาด' });
+  } else {
+    await interaction.reply({ content: '❌ เกิดข้อผิดพลาด', ephemeral: true });
+  }
+} catch {}
+
 }
 
   }
