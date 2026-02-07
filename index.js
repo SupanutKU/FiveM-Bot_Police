@@ -342,14 +342,6 @@ setInterval(async () => {
 client.on(Events.InteractionCreate, async (interaction) => {
   try {
     
-    /* ========== SLASH COMMAND (/setup) ========== */
-    if (interaction.isChatInputCommand()) {
-      const command = client.commands.get(interaction.commandName);
-      if (!command) return;
-      
-      await command.execute(interaction);
-      return; // ⭐ สำคัญ
-    }
     /* ========== BUTTONS (ส่งเคส) ========== */
     if (!interaction.isButton()) return;
 
@@ -357,6 +349,26 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
     // 🛑 กัน interaction ที่ถูกตอบไปแล้ว (FIX 40060)
     if (i.replied || i.deferred) return;
+/* ================= CREATE CASE BUTTONS ================= */
+if (i.customId === 'create_normal') {
+  await i.deferReply({ ephemeral: true });
+  return createCaseChannel(i, 'normal');
+}
+
+if (i.customId === 'create_take2') {
+  await i.deferReply({ ephemeral: true });
+  return createCaseChannel(i, 'take2');
+}
+
+if (i.customId === 'create_store') {
+  await i.deferReply({ ephemeral: true });
+  return createCaseChannel(i, 'store');
+}
+
+if (i.customId === 'create_orange_red') {
+  await i.deferReply({ ephemeral: true });
+  return createCaseChannel(i, 'orange_red');
+}
 
     /* ================= SUBMIT CASE ================= */
     if (i.customId === 'submit_case') {
