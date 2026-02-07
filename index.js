@@ -52,14 +52,9 @@ async function getMemberName(guild, userId) {
     return `ไม่พบผู้ใช้ (${userId})`;
   }
 }
-function getThaiISOString() {
-  const now = new Date();
-  const thaiTime = new Date(
-    now.toLocaleString("en-US", { timeZone: "Asia/Bangkok" })
-  );
-  return thaiTime.toISOString();
+function getUTCISOString() {
+  return new Date().toISOString(); // UTC แท้
 }
-
 
 /* ================= CLIENT ================= */
 const client = new Client({
@@ -378,7 +373,7 @@ if (i.isButton() && i.customId === 'confirm_submit') {
     officer: room.ownerId,
     type: room.caseType,
     helpers: [...room.tagged],
-    createdAt: getThaiISOString(),
+    createdAt: getUTCISOString(),
     imageUrl: room.imageUrl
   };
 
@@ -482,8 +477,8 @@ if (i.customId === 'mycase_this_week') {
     if (!isOfficer && !isHelper) return false;
     if (!c.createdAt) return false;
 
-    const caseDate = formatThaiDateTime(c.createdAt)
-    return caseDate >= start && caseDate <= end;
+  const caseDate = new Date(c.createdAt);
+  return caseDate >= start && caseDate <= end;
   });
 
   const count = {
@@ -991,7 +986,7 @@ if (interaction.isButton() && interaction.customId === 'export_excel') {
         helperNames = arr.join(', ');
       }
 
-      const created = formatThaiDateTime(c.createdAt)
+      const created = new Date(c.createdAt);
       const weekKey = `${created.getFullYear()}-W${Math.ceil(created.getDate() / 7)}`;
       const monthKey = `${created.getFullYear()}-${created.getMonth() + 1}`;
 
