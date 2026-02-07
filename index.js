@@ -280,34 +280,46 @@ client.on(Events.InteractionCreate, async (interaction) => {
     }
 
     /* ===== SUBMIT CASE ===== */
-    if (i.isButton() && i.customId === 'submit_case') {
-      const room = caseRooms.get(i.channel.id);
-      if (!room) {
-        return i.reply({ content: '❌ ห้องนี้ไม่ใช่ห้องคดี', ephemeral: true });
-      }
+if (i.isButton() && i.customId === 'submit_case') {
+  const room = caseRooms.get(i.channel.id);
+  if (!room) {
+    return i.reply({ content: '❌ ห้องนี้ไม่ใช่ห้องคดี', ephemeral: true });
+  }
 
-      const isOwner = i.user.id === room.ownerId;
-      const isHelper = room.tagged.has(i.user.id);
+  const isOwner = i.user.id === room.ownerId;
+  const isHelper = room.tagged.has(i.user.id);
 
-      if (!isOwner && !isHelper) {
-        return i.reply({
-          content: '❌ เฉพาะเจ้าของคดีหรือผู้ช่วยเท่านั้น',
-          ephemeral: true
-        });
-      }
+  if (!isOwner && !isHelper) {
+    return i.reply({
+      content: '❌ เฉพาะเจ้าของคดีหรือผู้ช่วยเท่านั้น',
+      ephemeral: true
+    });
+  }
 
-      if (!room.hasImage) {
-        return i.reply({
-          content: '❌ ต้องส่งรูปก่อนถึงจะส่งคดีได้',
-          ephemeral: true
-        });
-      }
+  if (!room.hasImage) {
+    return i.reply({
+      content: '❌ ต้องส่งรูปก่อนถึงจะส่งคดีได้',
+      ephemeral: true
+    });
+  }
 
-      return i.reply({
-        content: '✅ พร้อมส่งคดีแล้ว',
-        ephemeral: true
-      });
+  // ✅ ตอบกลับก่อน
+  await i.reply({
+    content: '📤 ส่งคดีเรียบร้อย\n⏳ ห้องจะถูกลบอัตโนมัติใน 5 วินาที',
+    ephemeral: true
+  });
+
+  // 🗑️ ลบห้องอัตโนมัติ
+  setTimeout(async () => {
+    if (i.channel && i.channel.deletable) {
+      caseRooms.delete(i.channel.id);
+      await i.channel.delete('Case submitted');
     }
+  }, 5000);
+
+  return;
+}
+
 
     /* ===== DELETE CASE ===== */
     if (i.isButton() && i.customId === 'delete_case') {
