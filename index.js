@@ -157,6 +157,26 @@ function formatThaiDateTime(input) {
   }).format(date);
 }
 
+function parseThaiDateTimeToTimestamp(thaiDateTime) {
+  // รูปแบบ: DD/MM/YYYY HH:mm:ss
+  const match = thaiDateTime.match(
+    /^(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2}):(\d{2})$/
+  );
+  if (!match) return null;
+
+  let [, dd, mm, yyyy, hh, mi, ss] = match;
+
+  const yearAD = parseInt(yyyy, 10) - 543; // 🔥 แปลง พ.ศ. → ค.ศ.
+
+  return new Date(
+    yearAD,
+    parseInt(mm, 10) - 1,
+    parseInt(dd, 10),
+    parseInt(hh, 10),
+    parseInt(mi, 10),
+    parseInt(ss, 10)
+  ).getTime();
+}
 /* =============================================== */
 
 function parseThaiDate(str) {
@@ -569,41 +589,30 @@ if (i.customId === 'check_my_case') {
 if (i.customId === 'mycase_this_week') {
   await i.deferReply({ ephemeral: true });
 
-  // ✅ ใช้เวลาไทยเท่านั้น
   const { start, end } = getThaiWeekRange();
-
   const cases = loadCases();
 
-  // ✅ กรองเคสของตัวเอง + อยู่ในช่วงสัปดาห์นี้ (แก้เรื่องเวลาแล้ว)
   const myCases = cases.filter(c => {
     const isOfficer = c.officer === i.user.id;
     const isHelper = c.helpers?.includes(i.user.id);
     if (!isOfficer && !isHelper) return false;
     if (!c.createdAt) return false;
 
-    let caseTime;
+    let caseTime = null;
 
-    // ✅ รองรับ createdAt ทุกแบบ
     if (typeof c.createdAt === 'number') {
-      // timestamp (ms)
       caseTime = c.createdAt;
     } else if (c.createdAt instanceof Date) {
       caseTime = c.createdAt.getTime();
     } else if (typeof c.createdAt === 'string') {
-      const parsed = new Date(c.createdAt);
-      if (isNaN(parsed)) return false;
-      caseTime = parsed.getTime();
-    } else {
-      return false;
+      // 🔥 รองรับเวลาไทย พ.ศ.
+      caseTime = parseThaiDateTimeToTimestamp(c.createdAt);
+      if (!caseTime) return false;
     }
 
-    return (
-      caseTime >= start.getTime() &&
-      caseTime <= end.getTime()
-    );
+    return caseTime >= start.getTime() && caseTime <= end.getTime();
   });
 
-  // ✅ นับเคส
   const count = {
     normal: { officer: 0, helper: 0 },
     take2: { officer: 0, helper: 0 },
@@ -617,7 +626,6 @@ if (i.customId === 'mycase_this_week') {
     if (c.helpers?.includes(i.user.id)) count[c.type].helper++;
   }
 
-  // ✅ แสดงช่วงเวลา (เวลาไทย)
   const rangeText = `${formatThaiDate(start)} ถึง ${formatThaiDate(end)}`;
 
   const embed = new EmbedBuilder()
