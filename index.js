@@ -384,20 +384,15 @@ if (i.isButton() && i.customId === 'submit_case') {
 
 }
 
-
 /* ===== CONFIRM SUBMIT ===== */
-if (i.isButton() && i.customId.startsWith('confirm_submit')) {
+if (i.isButton() && i.customId === 'confirm_submit') {
   await i.deferReply({ ephemeral: true });
 
-  // 🔑 ดึง channelId ของห้องคดีจากปุ่ม
-  const channelId = i.customId.split(':')[1];
-
-  const room = caseRooms.get(channelId);
+  const room = caseRooms.get(i.channel.id);
   if (!room) {
     return i.editReply('❌ ไม่พบข้อมูลคดี');
   }
 
-  const caseChannel = await i.guild.channels.fetch(channelId);
   const cases = loadCases();
 
   const newCase = {
@@ -405,7 +400,7 @@ if (i.isButton() && i.customId.startsWith('confirm_submit')) {
     officer: room.ownerId,
     type: room.caseType,
     helpers: [...room.tagged],
-    createdAt: Date.now(),
+    createdAt: getUTCISOString(),
     imageUrl: room.imageUrl
   };
 
@@ -414,16 +409,15 @@ if (i.isButton() && i.customId.startsWith('confirm_submit')) {
       ? newCase.helpers.map(id => `<@${id}>`).join(', ')
       : 'ไม่มี';
 
-  const embed = new EmbedBuilder()
-    .setColor(0x2ecc71)
-    .setTitle('📁 บันทึกคดี')
-    .setDescription(
-      `👮 คนลงคดี\n<@${newCase.officer}>\n\n` +
-      `🛠 ผู้ช่วย\n${helpersText}\n\n` +
-      `🕒 เวลา\n${formatThaiDateTime(newCase.createdAt)}`
-    )
-    .setImage(newCase.imageUrl)
-    .setFooter({ text: 'Bot Police' });
+const embed = buildCaseLogEmbed({
+  caseType: newCase.type,
+  officerId: newCase.officer,
+  helpers: newCase.helpers,
+  imageUrl: newCase.imageUrl,
+  createdAt: newCase.createdAt,
+  channelName: i.channel.name
+});
+
 
   const logChannel = await i.guild.channels.fetch(LOG_CHANNEL_ID);
   const logMsg = await logChannel.send({ embeds: [embed] });
@@ -433,17 +427,14 @@ if (i.isButton() && i.customId.startsWith('confirm_submit')) {
   saveCases(cases);
 
   await i.editReply('✅ ส่งคดีเรียบร้อย');
-
-  await caseChannel.send(
+  await i.channel.send(
     `📌 บันทึกคดีแล้ว\n🔗 https://discord.com/channels/${i.guild.id}/${LOG_CHANNEL_ID}/${logMsg.id}`
   );
 
-  // 🧹 ล้างข้อมูลห้องคดี
-  caseRooms.delete(channelId);
+  caseRooms.delete(i.channel.id); // ✅ สำคัญมาก
 
-  // 🗑 ลบห้องอัตโนมัติ
   setTimeout(() => {
-    caseChannel.delete().catch(() => {});
+    i.channel.delete().catch(() => {});
   }, 3000);
 }
 
