@@ -361,6 +361,7 @@ if (interaction.isChatInputCommand()) {
       content: '❌ เกิดข้อผิดพลาดขณะรันคำสั่ง'
     });
   }
+  return;
 }
 
     const i = interaction;
@@ -417,7 +418,7 @@ if (i.isButton() && i.customId === 'submit_case') {
       .setStyle(ButtonStyle.Secondary)
   );
 
-  return safeReply(i, {
+return i.reply({
   content: '📤 กรุณายืนยันการส่งคดี',
   components: [row],
   ephemeral: true
@@ -425,93 +426,101 @@ if (i.isButton() && i.customId === 'submit_case') {
 
 }
 
+/* ================= BUTTON HANDLER ================= */
+if (i.isButton()) {
 
-/* ===== CONFIRM SUBMIT ===== */
-if (i.isButton() && i.customId === 'confirm_submit') {
+  /* ===== CONFIRM SUBMIT ===== */
+  if (i.customId === 'confirm_submit') {
+    // ❌ ห้าม deferReply / reply เด็ดขาด
 
-  // ❌ ห้าม deferReply / reply เด็ดขาด
+    const room = caseRooms.get(i.channel.id);
+    if (!room) {
+      return i.update({
+        content: '❌ ไม่พบข้อมูลคดี',
+        components: []
+      });
+    }
 
-  const room = caseRooms.get(i.channel.id);
-  if (!room) {
+    const cases = loadCases();
+
+    const newCase = {
+      id: Date.now(),
+      officer: room.ownerId,
+      type: room.caseType,
+      helpers: [...room.tagged],
+      createdAt: Date.now(),
+      imageUrl: room.imageUrl
+    };
+
+    const helpersText =
+      newCase.helpers.length
+        ? newCase.helpers.map(id => `<@${id}>`).join(', ')
+        : 'ไม่มี';
+
+    const embed = new EmbedBuilder()
+      .setColor(0x2ecc71)
+      .setTitle('📁 บันทึกคดี')
+      .setDescription(
+        `👮 คนลงคดี\n<@${newCase.officer}>\n\n` +
+        `🛠 ผู้ช่วย\n${helpersText}\n\n` +
+        `🕒 เวลา\n${formatThaiDateTime(newCase.createdAt)}`
+      )
+      .setImage(newCase.imageUrl)
+      .setFooter({ text: 'Bot Police' });
+
+    const logChannel = await i.guild.channels.fetch(LOG_CHANNEL_ID);
+    const logMsg = await logChannel.send({ embeds: [embed] });
+
+    newCase.logMessageId = logMsg.id;
+    cases.push(newCase);
+    saveCases(cases);
+
+    // ✅ ตอบ interaction ด้วย update (สำคัญมาก)
+    await i.update({
+      content: '✅ ส่งคดีเรียบร้อย',
+      components: []
+    });
+
+    await i.channel.send(
+      `📌 บันทึกคดีแล้ว\n🔗 https://discord.com/channels/${i.guild.id}/${LOG_CHANNEL_ID}/${logMsg.id}`
+    );
+
+    caseRooms.delete(i.channel.id);
+
+    setTimeout(() => {
+      i.channel.delete().catch(() => {});
+    }, 3000);
+  }
+
+  /* ===== CANCEL SUBMIT ===== */
+  if (i.customId === 'cancel_submit') {
     return i.update({
-      content: '❌ ไม่พบข้อมูลคดี',
+      content: '❌ ยกเลิกการส่งคดีแล้ว',
       components: []
     });
   }
 
-  const cases = loadCases();
+  /* ===== DELETE CASE CHANNEL ===== */
+  if (i.customId === 'delete_case') {
+    await i.deferReply({ ephemeral: true });
 
-  const newCase = {
-    id: Date.now(),
-    officer: room.ownerId,
-    type: room.caseType,
-    helpers: [...room.tagged],
-    createdAt: Date.now(),
-    imageUrl: room.imageUrl
-  };
+    const room = caseRooms.get(i.channel.id);
+    if (!room) {
+      return i.editReply('❌ ห้องนี้ไม่ใช่ห้องคดี');
+    }
 
-  const helpersText =
-    newCase.helpers.length
-      ? newCase.helpers.map(id => `<@${id}>`).join(', ')
-      : 'ไม่มี';
+    // 🔐 อนุญาตเฉพาะเจ้าของคดี หรือ ADMIN / POLICE
+    const isOwner = i.user.id === room.ownerId;
+    const isPolice = i.member.roles.cache.has(POLICE_ROLE_ID);
 
-  const embed = new EmbedBuilder()
-    .setColor(0x2ecc71)
-    .setTitle('📁 บันทึกคดี')
-    .setDescription(
-      `👮 คนลงคดี\n<@${newCase.officer}>\n\n` +
-      `🛠 ผู้ช่วย\n${helpersText}\n\n` +
-      `🕒 เวลา\n${formatThaiDateTime(newCase.createdAt)}`
-    )
-    .setImage(newCase.imageUrl)
-    .setFooter({ text: 'Bot Police' });
+    if (!isOwner && !isPolice) {
+      return i.editReply('❌ คุณไม่มีสิทธิ์ลบห้องนี้');
+    }
 
-  const logChannel = await i.guild.channels.fetch(LOG_CHANNEL_ID);
-  const logMsg = await logChannel.send({ embeds: [embed] });
-
-  newCase.logMessageId = logMsg.id;
-  cases.push(newCase);
-  saveCases(cases);
-
-  // ✅ ตอบ interaction ด้วย update
-  await i.update({
-    content: '✅ ส่งคดีเรียบร้อย',
-    components: []
-  });
-
-  await i.channel.send(
-    `📌 บันทึกคดีแล้ว\n🔗 https://discord.com/channels/${i.guild.id}/${LOG_CHANNEL_ID}/${logMsg.id}`
-  );
-
-  caseRooms.delete(i.channel.id);
-
-  setTimeout(() => {
-    i.channel.delete().catch(() => {});
-  }, 3000);
-}
-
-
-/* ===== DELETE CASE CHANNEL ===== */
-if (i.isButton() && i.customId === 'delete_case') {
-  await i.deferReply({ ephemeral: true });
-
-  const room = caseRooms.get(i.channel.id);
-  if (!room) {
-    return i.editReply('❌ ห้องนี้ไม่ใช่ห้องคดี');
+    await i.editReply('🗑️ กำลังลบห้อง...');
+    await i.channel.delete().catch(console.error);
   }
-
-  // 🔐 อนุญาตเฉพาะเจ้าของคดี หรือ POLICE
-  const isOwner = i.user.id === room.ownerId;
-  const isPolice = i.member.roles.cache.has(POLICE_ROLE_ID);
-
-  if (!isOwner && !isPolice) {
-    return i.editReply('❌ คุณไม่มีสิทธิ์ลบห้องนี้');
-  }
-
-  await i.editReply('🗑️ กำลังลบห้อง...');
-  await i.channel.delete().catch(console.error);
 }
-
 
 /* ===== เช็คเคสตัวเอง ===== */
 if (i.customId === 'check_my_case') {
