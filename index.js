@@ -386,14 +386,18 @@ if (i.isButton() && i.customId === 'submit_case') {
 
 
 /* ===== CONFIRM SUBMIT ===== */
-if (i.isButton() && i.customId === 'confirm_submit') {
+if (i.isButton() && i.customId.startsWith('confirm_submit')) {
   await i.deferReply({ ephemeral: true });
 
-  const room = caseRooms.get(i.channel.id);
+  // 🔑 ดึง channelId ของห้องคดีจากปุ่ม
+  const channelId = i.customId.split(':')[1];
+
+  const room = caseRooms.get(channelId);
   if (!room) {
     return i.editReply('❌ ไม่พบข้อมูลคดี');
   }
 
+  const caseChannel = await i.guild.channels.fetch(channelId);
   const cases = loadCases();
 
   const newCase = {
@@ -429,14 +433,17 @@ if (i.isButton() && i.customId === 'confirm_submit') {
   saveCases(cases);
 
   await i.editReply('✅ ส่งคดีเรียบร้อย');
-  await i.channel.send(
+
+  await caseChannel.send(
     `📌 บันทึกคดีแล้ว\n🔗 https://discord.com/channels/${i.guild.id}/${LOG_CHANNEL_ID}/${logMsg.id}`
   );
 
-  caseRooms.delete(i.channel.id); // ✅ สำคัญมาก
+  // 🧹 ล้างข้อมูลห้องคดี
+  caseRooms.delete(channelId);
 
+  // 🗑 ลบห้องอัตโนมัติ
   setTimeout(() => {
-    i.channel.delete().catch(() => {});
+    caseChannel.delete().catch(() => {});
   }, 3000);
 }
 
