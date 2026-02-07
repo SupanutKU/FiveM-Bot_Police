@@ -355,6 +355,7 @@ if (interaction.isChatInputCommand()) {
       content: '❌ เกิดข้อผิดพลาดขณะรันคำสั่ง'
     });
   }
+  return;
 }
 
     const i = interaction;
