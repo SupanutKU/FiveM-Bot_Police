@@ -66,17 +66,17 @@ const dutyListener = require('./duty/dutyListener');
 dutyListener(client);
 
 async function safeReply(interaction, options) {
-  if (interaction.deferred) {
-    return interaction.editReply(options);
+  try {
+    if (interaction.deferred || interaction.replied) {
+      return await interaction.editReply(options);
+    } else {
+      return await interaction.reply(options);
+    }
+  } catch (err) {
+    console.error('safeReply error:', err);
   }
-
-  if (interaction.replied) {
-    const { ephemeral, ...rest } = options; // ❗ ห้าม ephemeral ใน followUp
-    return interaction.followUp(rest);
-  }
-
-  return interaction.reply(options);
 }
+
 
 async function safeEdit(interaction, options) {
   if (interaction.replied || interaction.deferred) {
