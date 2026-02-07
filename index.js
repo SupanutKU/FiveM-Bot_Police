@@ -262,23 +262,47 @@ async function createCaseChannel(interaction, caseType) {
 /* ================= MESSAGE TRACK ================= */
 client.on(Events.MessageCreate, msg => {
   if (msg.author.bot || !msg.guild) return;
+
   const room = caseRooms.get(msg.channel.id);
   if (!room) return;
 
-  room.lastActive = Date.now(); // ✅ เพิ่ม
+  // อัปเดตเวลาใช้งานล่าสุด
+  room.lastActive = Date.now();
 
+  // =====================
+  // ✅ 1. เช็ครูปจาก attachment
+  // =====================
   if (msg.attachments.size) {
     const att = msg.attachments.first();
     if (att?.contentType?.startsWith('image/')) {
       room.hasImage = true;
       room.imageUrl = att.url;
+      return;
     }
   }
 
+  // =====================
+  // ✅ 2. เช็ครูปจาก embed (สำคัญมาก)
+  // =====================
+  if (msg.embeds.length) {
+    const embed = msg.embeds[0];
+    if (embed.image?.url) {
+      room.hasImage = true;
+      room.imageUrl = embed.image.url;
+      return;
+    }
+  }
+
+  // =====================
+  // ✅ 3. เก็บคนที่ถูกแท็ก
+  // =====================
   for (const u of msg.mentions.users.values()) {
-    if (u.id !== msg.author.id) room.tagged.add(u.id);
+    if (u.id !== msg.author.id) {
+      room.tagged.add(u.id);
+    }
   }
 });
+
 setInterval(async () => {
   const now = Date.now();
 
