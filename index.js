@@ -349,7 +349,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
   try {
     // ===== Slash Command Handler =====
 if (interaction.isChatInputCommand()) {
-
   const command = client.commands.get(interaction.commandName);
   if (!command) return;
 
@@ -357,11 +356,19 @@ if (interaction.isChatInputCommand()) {
     await command.execute(interaction);
   } catch (error) {
     console.error(error);
-    await interaction.editReply({
-      content: '❌ เกิดข้อผิดพลาดขณะรันคำสั่ง'
-    });
+
+    // 🔒 ป้องกัน InteractionNotReplied
+    if (!interaction.replied && !interaction.deferred) {
+      await interaction.reply({
+        content: '❌ เกิดข้อผิดพลาดขณะรันคำสั่ง',
+        ephemeral: true
+      });
+    }
   }
+
+  return; // ✅ สำคัญมาก กันไม่ให้ไหลไปโดน logic อื่น
 }
+
 
     const i = interaction;
 
