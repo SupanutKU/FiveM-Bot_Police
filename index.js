@@ -255,17 +255,18 @@ client.on(Events.MessageCreate, msg => {
 /* ======================
    INTERACTION HANDLER
 ====================== */
-client.on(Events.InteractionCreate, async (i) => {
+const i = interaction;
+client.on(Events.InteractionCreate, async (i) => { 
   try {
 
-    /* ================= SLASH COMMAND ================= */
+    /* ===== SLASH COMMAND ===== */
     if (i.isChatInputCommand()) {
       const cmd = client.commands.get(i.commandName);
-      if (cmd) await cmd.execute(i);
+      if (cmd) return await cmd.execute(i);
       return;
     }
 
-    /* ================= CREATE CASE ================= */
+    /* ===== CREATE CASE ===== */
     const caseMap = {
       case_normal: 'normal',
       case_take2: 'take2',
@@ -273,115 +274,61 @@ client.on(Events.InteractionCreate, async (i) => {
       case_store: 'store'
     };
 
-    if (i.isButton() && caseMap[i.customId]) {
+    if (caseMap[i.customId]) {
       await i.deferReply({ ephemeral: true });
       return createCaseChannel(i, caseMap[i.customId]);
     }
 
-    /* ================= SUBMIT CASE (PREVIEW) ================= */
+    /* ===== SUBMIT CASE ===== */
     if (i.isButton() && i.customId === 'submit_case') {
       const room = caseRooms.get(i.channel.id);
-      if (!room)
+      if (!room) {
         return i.reply({ content: '❌ ห้องนี้ไม่ใช่ห้องคดี', ephemeral: true });
+      }
 
       const isOwner = i.user.id === room.ownerId;
       const isHelper = room.tagged.has(i.user.id);
 
-      if (!isOwner && !isHelper)
-        return i.reply({ content: '❌ ไม่มีสิทธิ์ส่งคดี', ephemeral: true });
+      if (!isOwner && !isHelper) {
+        return i.reply({
+          content: '❌ เฉพาะเจ้าของคดีหรือผู้ช่วยเท่านั้น',
+          ephemeral: true
+        });
+      }
 
-      if (!room.hasImage)
-        return i.reply({ content: '❌ ต้องส่งรูปก่อน', ephemeral: true });
+      if (!room.hasImage) {
+        return i.reply({
+          content: '❌ ต้องส่งรูปก่อนถึงจะส่งคดีได้',
+          ephemeral: true
+        });
+      }
 
-      const helpers =
-        room.tagged.size > 0
-          ? [...room.tagged].map(id => `<@${id}>`).join(', ')
-          : 'ไม่มี';
-
-      const embed = new EmbedBuilder()
-        .setColor(0xf1c40f)
-        .setTitle('📋 ตัวอย่างคดีก่อนส่ง')
-        .setDescription(
-          `👮 เจ้าของคดี: <@${room.ownerId}>\n` +
-          `📂 ประเภทคดี: ${room.caseType}\n` +
-          `🛠 ผู้ช่วย: ${helpers}`
-        )
-        .setImage(room.imageUrl);
-
-      const row = new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-          .setCustomId('confirm_submit')
-          .setLabel('✅ ยืนยันส่งคดี')
-          .setStyle(ButtonStyle.Success),
-        new ButtonBuilder()
-          .setCustomId('cancel_submit')
-          .setLabel('❌ ยกเลิก')
-          .setStyle(ButtonStyle.Secondary)
-      );
-
-      return i.reply({ embeds: [embed], components: [row], ephemeral: true });
-    }
-
-    /* ================= CONFIRM SUBMIT ================= */
-    if (i.isButton() && i.customId === 'confirm_submit') {
-      await i.deferReply({ ephemeral: true });
-
-      const room = caseRooms.get(i.channel.id);
-      if (!room) return i.editReply('❌ ไม่พบข้อมูลคดี');
-
-      const cases = loadCases();
-      cases.push({
-        id: Date.now(),
-        officer: room.ownerId,
-        type: room.caseType,
-        helpers: [...room.tagged],
-        createdAt: getThaiISOString(),
-        imageUrl: room.imageUrl
+      return i.reply({
+        content: '✅ พร้อมส่งคดีแล้ว',
+        ephemeral: true
       });
-
-      saveCases(cases);
-
-      await i.editReply('✅ ส่งคดีเรียบร้อย กำลังลบห้อง...');
-      setTimeout(() => i.channel.delete().catch(() => {}), 2000);
-      return;
     }
-
-    /* ================= CANCEL SUBMIT ================= */
-    if (i.isButton() && i.customId === 'cancel_submit') {
-      return i.reply({ content: '❎ ยกเลิกการส่งคดีแล้ว', ephemeral: true });
-    }
-
-    /* ================= DELETE CASE ================= */
+/*PREVIEW CASE */
+    /* ===== DELETE CASE ===== */
     if (i.isButton() && i.customId === 'delete_case') {
       await i.deferReply({ ephemeral: true });
 
       const room = caseRooms.get(i.channel.id);
-      if (!room) return i.editReply('❌ ห้องนี้ไม่ใช่ห้องคดี');
+      if (!room) {
+        return i.editReply('❌ ห้องนี้ไม่ใช่ห้องคดี');
+      }
 
       const isOwner = i.user.id === room.ownerId;
       const isPolice = i.member.roles.cache.has(POLICE_ROLE_ID);
 
-      if (!isOwner && !isPolice)
+      if (!isOwner && !isPolice) {
         return i.editReply('❌ คุณไม่มีสิทธิ์ลบห้องนี้');
+      }
 
       await i.editReply('🗑️ กำลังลบห้อง...');
-      await i.channel.delete().catch(() => {});
+      await i.channel.delete();
       return;
     }
-
-  } catch (err) {
-    console.error('INTERACTION ERROR:', err);
-    if (i.isRepliable()) {
-      try {
-        if (i.replied || i.deferred)
-          await i.followUp({ content: '❌ เกิดข้อผิดพลาด', ephemeral: true });
-        else
-          await i.reply({ content: '❌ เกิดข้อผิดพลาด', ephemeral: true });
-      } catch {}
-    }
-  }
-});
-
 
     /* ===== เช็คเคสตัวเอง ===== */
 if (i.customId === 'check_my_case') {
@@ -1159,6 +1106,20 @@ function exportDutyExcel() {
   });
 }
 
+  } catch (err) {
+    console.error('INTERACTION ERROR:', err);
+    if (interaction.isRepliable()) {
+  try {
+    if (interaction.deferred || interaction.replied) {
+      await interaction.followUp({ content: '❌ เกิดข้อผิดพลาด', ephemeral: true });
+    } else {
+      await interaction.editReply({ content: '❌ เกิดข้อผิดพลาด', ephemeral: true });
+    }
+  } catch {}
+}
+
+  }
+});
 exportDutyExcel()
   .then(file => console.log('📊 Export สำเร็จ:', file))
   .catch(err => console.error('❌ Export ล้มเหลว:', err.message));
