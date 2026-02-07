@@ -279,6 +279,37 @@ client.on(Events.InteractionCreate, async (interaction) => {
       await i.deferReply({ ephemeral: true });
       return createCaseChannel(i, caseMap[i.customId]);
     }
+
+    /* ===== SUBMIT CASE ===== */
+if (i.isButton() && i.customId === 'submit_case') {
+  const room = caseRooms.get(i.channel.id);
+  if (!room) {
+    return i.reply({ content: '❌ ห้องนี้ไม่ใช่ห้องคดี', ephemeral: true });
+  }
+
+  const isOwner = i.user.id === room.ownerId;
+  const isHelper = room.tagged.has(i.user.id);
+
+  if (!isOwner && !isHelper) {
+    return i.reply({
+      content: '❌ เฉพาะเจ้าของคดีหรือผู้ช่วยเท่านั้น',
+      ephemeral: true
+    });
+  }
+
+  if (!room.hasImage) {
+    return i.reply({
+      content: '❌ ต้องส่งรูปก่อนถึงจะส่งคดีได้',
+      ephemeral: true
+    });
+  }
+
+  return i.reply({
+    content: '✅ พร้อมส่งคดีแล้ว',
+    ephemeral: true
+  });
+}
+
     /* ===== SUBMIT CASE (PREVIEW) ===== */
 if (i.isButton() && i.customId === 'submit_case') {
   const room = caseRooms.get(i.channel.id);
@@ -371,31 +402,28 @@ if (i.isButton() && i.customId === 'confirm_submit') {
     i.channel.delete().catch(() => {});
   }, 2000);
 }
-/* ===== DELETE CASE ===== */
-if (interaction.isButton() && interaction.customId === 'delete_case') {
-  const room = caseRooms.get(interaction.channel.id);
 
+/* ===== DELETE CASE CHANNEL ===== */
+if (i.isButton() && i.customId === 'delete_case') {
+  await i.deferReply({ ephemeral: true });
+
+  const room = caseRooms.get(i.channel.id);
   if (!room) {
-    return interaction.reply({
-      content: '❌ ห้องนี้ไม่ใช่ห้องคดี',
-      ephemeral: true
-    });
+    return i.editReply('❌ ห้องนี้ไม่ใช่ห้องคดี');
   }
 
-  const isOwner = interaction.user.id === room.ownerId;
-  const isPolice = interaction.member.roles.cache.has(POLICE_ROLE_ID);
+  // 🔐 อนุญาตเฉพาะเจ้าของคดี หรือ POLICE
+  const isOwner = i.user.id === room.ownerId;
+  const isPolice = i.member.roles.cache.has(POLICE_ROLE_ID);
 
   if (!isOwner && !isPolice) {
-    return interaction.reply({
-      content: '❌ คุณไม่มีสิทธิ์ลบห้องนี้',
-      ephemeral: true
-    });
+    return i.editReply('❌ คุณไม่มีสิทธิ์ลบห้องนี้');
   }
 
-  await interaction.deferReply({ ephemeral: true });
-  caseRooms.delete(interaction.channel.id);
-  await interaction.channel.delete();
+  await i.editReply('🗑️ กำลังลบห้อง...');
+  await i.channel.delete().catch(console.error);
 }
+
 
     /* ===== เช็คเคสตัวเอง ===== */
 if (i.customId === 'check_my_case') {
