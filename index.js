@@ -374,7 +374,7 @@ if (interaction.isChatInputCommand()) {
       return createCaseChannel(i, caseMap[i.customId]);
     }
 
-    /* ===== SUBMIT CASE ===== */
+/* ================= SUBMIT CASE ================= */
 if (i.isButton() && i.customId === 'submit_case') {
   const room = caseRooms.get(i.channel.id);
   if (!room) {
@@ -413,15 +413,14 @@ if (i.isButton() && i.customId === 'submit_case') {
   );
 
   return safeReply(i, {
-  content: '📤 กรุณายืนยันการส่งคดี',
-  components: [row],
-  ephemeral: true
-});
-
+    content: '📤 กรุณายืนยันการส่งคดี',
+    components: [row],
+    ephemeral: true
+  });
 }
 
 
-/* ===== CONFIRM SUBMIT ===== */
+/* ================= CONFIRM SUBMIT ================= */
 if (i.isButton() && i.customId === 'confirm_submit') {
   await i.deferReply({ ephemeral: true });
 
@@ -442,7 +441,7 @@ if (i.isButton() && i.customId === 'confirm_submit') {
   };
 
   const helpersText =
-    newCase.helpers.length
+    newCase.helpers.length > 0
       ? newCase.helpers.map(id => `<@${id}>`).join(', ')
       : 'ไม่มี';
 
@@ -465,15 +464,28 @@ if (i.isButton() && i.customId === 'confirm_submit') {
   saveCases(cases);
 
   await i.editReply('✅ ส่งคดีเรียบร้อย');
+
   await i.channel.send(
     `📌 บันทึกคดีแล้ว\n🔗 https://discord.com/channels/${i.guild.id}/${LOG_CHANNEL_ID}/${logMsg.id}`
   );
 
-  caseRooms.delete(i.channel.id); // ✅ สำคัญมาก
+  // 🧹 ล้างข้อมูลห้อง
+  caseRooms.delete(i.channel.id);
 
+  // ⏳ ลบห้องอัตโนมัติ
   setTimeout(() => {
     i.channel.delete().catch(() => {});
   }, 3000);
+
+  return;
+}
+
+/* ================= CANCEL SUBMIT ================= */
+if (i.isButton() && i.customId === 'cancel_submit') {
+  return safeReply(i, {
+    content: '❌ ยกเลิกการส่งคดีแล้ว',
+    ephemeral: true
+  });
 }
 
 /* ===== DELETE CASE CHANNEL ===== */
