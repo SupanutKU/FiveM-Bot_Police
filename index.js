@@ -275,11 +275,12 @@ setInterval(async () => {
 /* ======================
    INTERACTION HANDLER
 ====================== */
-if (interaction.isButton() || interaction.isModalSubmit()) {
-  if (interaction.replied || interaction.deferred) return;
-}
+
 client.on(Events.InteractionCreate, async (interaction) => { 
   try {
+    if (interaction.isButton() || interaction.isModalSubmit()) {
+  if (interaction.replied || interaction.deferred) return;
+}
     /* ===== SLASH ===== */
     if (interaction.isChatInputCommand()) {
       const cmd = client.commands.get(interaction.commandName);
