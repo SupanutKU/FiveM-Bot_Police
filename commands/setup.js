@@ -11,6 +11,8 @@ module.exports = {
     .setDescription('เปิดเมนูระบบคดี'),
 
   async execute(interaction) {
+    // ⭐ สำคัญที่สุด แก้ Unknown interaction
+    await interaction.deferReply({ ephemeral: false });
 
     /* ================= ROW 1 : ลงคดี ================= */
     const row1 = new ActionRowBuilder().addComponents(
@@ -53,7 +55,7 @@ module.exports = {
         .setStyle(ButtonStyle.Secondary)
     );
 
-    /* ================= ROW 3 : รายงาน / DB ================= */
+    /* ================= ROW 3 : รายงาน ================= */
     const row3 = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
         .setCustomId('export_excel')
@@ -66,11 +68,10 @@ module.exports = {
         .setStyle(ButtonStyle.Secondary)
     );
 
-    // ✅ ตอบ interaction แค่ครั้งเดียว
-    await interaction.reply({
+    // ✅ ตอบหลัง defer
+    await interaction.editReply({
       content: 'เลือกปุ่มด้านล่างเพื่อดำเนินการ:',
-      components: [row1, row2, row3],
-      ephemeral: false
+      components: [row1, row2, row3]
     });
   }
 };
