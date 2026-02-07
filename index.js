@@ -36,7 +36,8 @@ const {
   ModalBuilder,
   TextInputBuilder,
   TextInputStyle,
-  UserSelectMenuBuilder
+  UserSelectMenuBuilder,
+  Partials
 } = require('discord.js');
 
 const exportDutyExcel = require('./duty/exportDutyExcel');
