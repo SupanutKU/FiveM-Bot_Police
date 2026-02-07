@@ -72,14 +72,14 @@ async function safeReply(interaction, options) {
   if (interaction.deferred) {
     return interaction.editReply(options);
   }
+
   if (interaction.replied) {
-    // ❌ ห้ามส่ง ephemeral ใน followUp
-    const { ephemeral, ...rest } = options;
+    const { ephemeral, ...rest } = options; // ❗ ห้าม ephemeral ใน followUp
     return interaction.followUp(rest);
   }
+
   return interaction.reply(options);
 }
-
 
 async function safeEdit(interaction, options) {
   if (interaction.replied || interaction.deferred) {
@@ -301,12 +301,22 @@ setInterval(async () => {
 
 client.on(Events.InteractionCreate, async (interaction) => { 
   try {
-    /* ===== SLASH ===== */
-    if (interaction.isChatInputCommand()) {
-      const cmd = client.commands.get(interaction.commandName);
-      if (cmd) return await cmd.execute(interaction);
-      return;
-    }
+    // ===== Slash Command Handler =====
+if (interaction.isChatInputCommand()) {
+  await interaction.deferReply({ ephemeral: true }); // ❌ ตัวการ 40060
+
+  const command = client.commands.get(interaction.commandName);
+  if (!command) return;
+
+  try {
+    await command.execute(interaction);
+  } catch (error) {
+    console.error(error);
+    await interaction.editReply({
+      content: '❌ เกิดข้อผิดพลาดขณะรันคำสั่ง'
+    });
+  }
+}
 
     const i = interaction;
 
