@@ -36,7 +36,8 @@ const {
   ModalBuilder,
   TextInputBuilder,
   TextInputStyle,
-  UserSelectMenuBuilder
+  UserSelectMenuBuilder,
+  Partials
 } = require('discord.js');
 
 const exportDutyExcel = require('./duty/exportDutyExcel');
@@ -52,14 +53,6 @@ async function getMemberName(guild, userId) {
     return `ไม่พบผู้ใช้ (${userId})`;
   }
 }
-function getThaiISOString() {
-  const now = new Date();
-  const thaiTime = new Date(
-    now.toLocaleString("en-US", { timeZone: "Asia/Bangkok" })
-  );
-  return thaiTime.toISOString();
-}
-
 
 /* ================= CLIENT ================= */
 const client = new Client({
@@ -68,15 +61,26 @@ const client = new Client({
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.MessageContent,
     GatewayIntentBits.GuildMembers // ✅ เพิ่ม
+  ],
+  partials: [
+    Partials.Message,
+    Partials.Channel,
+    Partials.Reaction
   ]
 });
 const dutyListener = require('./duty/dutyListener');
 dutyListener(client);
 
 async function safeReply(interaction, options) {
-  if (interaction.replied || interaction.deferred) {
-    return interaction.followUp(options);
+  if (interaction.deferred) {
+    return interaction.editReply(options);
   }
+
+  if (interaction.replied) {
+    const { ephemeral, ...rest } = options; // ❗ ห้าม ephemeral ใน followUp
+    return interaction.followUp(rest);
+  }
+
   return interaction.reply(options);
 }
 
@@ -105,27 +109,56 @@ function loadCases() {
   if (!fs.existsSync(DATA_PATH)) return [];
   return JSON.parse(fs.readFileSync(DATA_PATH, 'utf8')).cases || [];
 }
-function getThisWeekRange() {
-  const now = new Date();
-  const day = now.getDay(); // 0 = อาทิตย์
+/* ================= TIME (THAI) ================= */
+function getThaiNow() {
+  return new Date(Date.now() + 7 * 60 * 60 * 1000);
+}
 
+function getThaiWeekRange() {
+  const now = getThaiNow();
+
+  const day = now.getDay(); // 0 = อาทิตย์
   const start = new Date(now);
   start.setDate(now.getDate() - day);
-  start.setHours(0, 0, 0, 0);
 
   const end = new Date(start);
   end.setDate(start.getDate() + 6);
+
+  start.setHours(0, 0, 0, 0);
   end.setHours(23, 59, 59, 999);
 
   return { start, end };
 }
+
 function formatThaiDate(date) {
-  return date.toLocaleDateString('th-TH', {
-    day: '2-digit',
+  return new Intl.DateTimeFormat('th-TH', {
+    timeZone: 'Asia/Bangkok',
+    year: 'numeric',
     month: '2-digit',
-    year: 'numeric'
-  });
+    day: '2-digit'
+  }).format(date);
 }
+
+function formatThaiDateTime(input) {
+  const date =
+    input instanceof Date
+      ? input
+      : new Date(input);
+
+  return new Intl.DateTimeFormat('th-TH', {
+    timeZone: 'Asia/Bangkok',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false
+  }).format(date);
+}
+
+
+/* =============================================== */
 
 function parseThaiDate(str) {
   if (!str || typeof str !== 'string') return null;
@@ -137,8 +170,6 @@ function parseThaiDate(str) {
   const [d, m, y] = clean[0].split('/').map(Number);
   return new Date(y - 543, m - 1, d);
 }
-
-
 
 function saveCases(cases) {
   fs.writeFileSync(DATA_PATH, JSON.stringify({ cases }, null, 2));
@@ -157,7 +188,13 @@ async function lockPoliceCategory(guild) {
 
   console.log('🔒 POLICE category locked');
 }
+client.on('error', err => {
+  console.error('DISCORD CLIENT ERROR:', err);
+});
 
+process.on('unhandledRejection', err => {
+  console.error('UNHANDLED REJECTION:', err);
+});
 /* ================= CREATE CASE CHANNEL ================= */
 async function createCaseChannel(interaction, caseType) {
   const guild = interaction.guild;
@@ -209,15 +246,16 @@ async function createCaseChannel(interaction, caseType) {
       }
     ]
   });
-
+const createdAt = Date.now(); // ⏰ เวลาเริ่มคดี (UTC timestamp)
   // ✅ REGISTER ROOM
- caseRooms.set(channel.id, {
+caseRooms.set(channel.id, {
   ownerId: user.id,
   caseType,
   hasImage: false,
   tagged: new Set(),
   imageUrl: null,
-  lastActive: Date.now() // ✅ เพิ่ม
+  createdAt,          // ✅ เวลาเริ่มคดี
+  lastActive: createdAt
 });
 
   const row = new ActionRowBuilder().addComponents(
@@ -235,33 +273,78 @@ async function createCaseChannel(interaction, caseType) {
   await interaction.editReply(`✅ สร้างห้อง ${channel} เรียบร้อย`);
 
   await channel.send({
-    content:
-      `👤 เจ้าของห้อง: <@${user.id}>\n` +
-      `📂 ประเภทคดี: ${caseType}\n\n` +
-      `📸 ต้องส่งรูปก่อน\n🏷️ แท็กผู้ช่วย`,
-    components: [row]
-  });
+  content:
+    `👤 เจ้าของห้อง: <@${user.id}>\n` +
+    `📂 ประเภทคดี: ${caseType}\n` +
+    `🕒 เวลาเริ่มคดี: ${formatThaiDateTime(createdAt)}\n\n` +
+    `📸 ต้องส่งรูปก่อน\n🏷️ แท็กผู้ช่วย`,
+  components: [row]
+});
+
 }
 /* ================= MESSAGE TRACK ================= */
 client.on(Events.MessageCreate, msg => {
   if (msg.author.bot || !msg.guild) return;
+
   const room = caseRooms.get(msg.channel.id);
   if (!room) return;
 
-  room.lastActive = Date.now(); // ✅ เพิ่ม
+  // อัปเดตเวลาใช้งานล่าสุด
+  room.lastActive = Date.now();
 
+  // =====================
+  // ✅ 1. เช็ครูปจาก attachment
+  // =====================
   if (msg.attachments.size) {
     const att = msg.attachments.first();
     if (att?.contentType?.startsWith('image/')) {
       room.hasImage = true;
       room.imageUrl = att.url;
+      return;
     }
   }
 
+  // =====================
+  // ✅ 2. เช็ครูปจาก embed (สำคัญมาก)
+  // =====================
+  if (msg.embeds.length) {
+    const embed = msg.embeds[0];
+    if (embed.image?.url) {
+      room.hasImage = true;
+      room.imageUrl = embed.image.url;
+      return;
+    }
+  }
+
+  // =====================
+  // ✅ 3. เก็บคนที่ถูกแท็ก
+  // =====================
   for (const u of msg.mentions.users.values()) {
-    if (u.id !== msg.author.id) room.tagged.add(u.id);
+    if (u.id !== msg.author.id) {
+      room.tagged.add(u.id);
+    }
   }
 });
+/* ================= DELETE LOG = DELETE CASE ================= */
+client.on(Events.MessageDelete, async (message) => {
+  // สนใจเฉพาะห้อง log เท่านั้น
+  if (!message.guild) return;
+  if (message.channel.id !== LOG_CHANNEL_ID) return;
+
+  const cases = loadCases();
+  const before = cases.length;
+
+  // ลบคดีที่ผูกกับ logMessageId นี้
+  const filteredCases = cases.filter(
+    c => c.logMessageId !== message.id
+  );
+
+  if (filteredCases.length !== before) {
+    saveCases(filteredCases);
+    console.log(`🗑️ ลบคดีที่ผูกกับ log ${message.id} แล้ว`);
+  }
+});
+
 setInterval(async () => {
   const now = Date.now();
 
@@ -284,15 +367,28 @@ setInterval(async () => {
 
 client.on(Events.InteractionCreate, async (interaction) => { 
   try {
-    if (interaction.isButton() || interaction.isModalSubmit()) {
-  if (interaction.replied || interaction.deferred) return;
-}
-    /* ===== SLASH ===== */
-    if (interaction.isChatInputCommand()) {
-      const cmd = client.commands.get(interaction.commandName);
-      if (cmd) return await cmd.execute(interaction);
-      return;
+    // ===== Slash Command Handler =====
+if (interaction.isChatInputCommand()) {
+  const command = client.commands.get(interaction.commandName);
+  if (!command) return;
+
+  try {
+    await command.execute(interaction);
+  } catch (error) {
+    console.error(error);
+
+    // 🔒 ป้องกัน InteractionNotReplied
+    if (!interaction.replied && !interaction.deferred) {
+      await interaction.reply({
+        content: '❌ เกิดข้อผิดพลาดขณะรันคำสั่ง',
+        ephemeral: true
+      });
     }
+  }
+
+  return; // ✅ สำคัญมาก กันไม่ให้ไหลไปโดน logic อื่น
+}
+
 
     const i = interaction;
 
@@ -305,7 +401,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
     };
 
     /* ===== CREATE CASE ===== */
-    if (caseMap[i.customId]) {
+    if (i.isButton() && caseMap[i.customId]) {
       await i.deferReply({ ephemeral: true });
       return createCaseChannel(i, caseMap[i.customId]);
     }
@@ -314,21 +410,24 @@ client.on(Events.InteractionCreate, async (interaction) => {
 if (i.isButton() && i.customId === 'submit_case') {
   const room = caseRooms.get(i.channel.id);
   if (!room) {
-    return i.reply({ content: '❌ ห้องนี้ไม่ใช่ห้องคดี', ephemeral: true });
+    return safeReply(i, {
+      content: '❌ ห้องนี้ไม่ใช่ห้องคดี',
+      ephemeral: true
+    });
   }
 
   const isOwner = i.user.id === room.ownerId;
   const isHelper = room.tagged.has(i.user.id);
 
   if (!isOwner && !isHelper) {
-    return i.reply({
+    return safeReply(i, {
       content: '❌ เฉพาะเจ้าของคดีหรือผู้ช่วยเท่านั้น',
       ephemeral: true
     });
   }
 
   if (!room.hasImage) {
-    return i.reply({
+    return safeReply(i, {
       content: '❌ ต้องส่งรูปก่อนถึงจะส่งคดีได้',
       ephemeral: true
     });
@@ -345,7 +444,8 @@ if (i.isButton() && i.customId === 'submit_case') {
       .setStyle(ButtonStyle.Secondary)
   );
 
-  return i.reply({
+  // ⚠️ ตรงนี้ reply ไปแล้ว
+  return safeReply(i, {
     content: '📤 กรุณายืนยันการส่งคดี',
     components: [row],
     ephemeral: true
@@ -354,7 +454,8 @@ if (i.isButton() && i.customId === 'submit_case') {
 
 /* ===== CONFIRM SUBMIT ===== */
 if (i.isButton() && i.customId === 'confirm_submit') {
-  await i.deferReply({ ephemeral: true });
+  // ❌ ห้าม defer แล้ว
+  // เพราะ interaction นี้เคย reply มาแล้ว
 
   const room = caseRooms.get(i.channel.id);
   if (!room) {
@@ -368,7 +469,7 @@ if (i.isButton() && i.customId === 'confirm_submit') {
     officer: room.ownerId,
     type: room.caseType,
     helpers: [...room.tagged],
-    createdAt: getThaiISOString(),
+    createdAt: Date.now(),
     imageUrl: room.imageUrl
   };
 
@@ -383,7 +484,7 @@ if (i.isButton() && i.customId === 'confirm_submit') {
     .setDescription(
       `👮 คนลงคดี\n<@${newCase.officer}>\n\n` +
       `🛠 ผู้ช่วย\n${helpersText}\n\n` +
-      `🕒 เวลา\n${new Date().toLocaleString('th-TH')}`
+      `🕒 เวลา\n${formatThaiDateTime(newCase.createdAt)}`
     )
     .setImage(newCase.imageUrl)
     .setFooter({ text: 'Bot Police' });
@@ -400,11 +501,13 @@ if (i.isButton() && i.customId === 'confirm_submit') {
     `📌 บันทึกคดีแล้ว\n🔗 https://discord.com/channels/${i.guild.id}/${LOG_CHANNEL_ID}/${logMsg.id}`
   );
 
-  caseRooms.delete(i.channel.id); // ✅ สำคัญมาก
+  caseRooms.delete(i.channel.id);
 
   setTimeout(() => {
     i.channel.delete().catch(() => {});
   }, 3000);
+
+  return;
 }
 
 /* ===== DELETE CASE CHANNEL ===== */
@@ -416,7 +519,6 @@ if (i.isButton() && i.customId === 'delete_case') {
     return i.editReply('❌ ห้องนี้ไม่ใช่ห้องคดี');
   }
 
-  // 🔐 อนุญาตเฉพาะเจ้าของคดี หรือ POLICE
   const isOwner = i.user.id === room.ownerId;
   const isPolice = i.member.roles.cache.has(POLICE_ROLE_ID);
 
@@ -426,6 +528,8 @@ if (i.isButton() && i.customId === 'delete_case') {
 
   await i.editReply('🗑️ กำลังลบห้อง...');
   await i.channel.delete().catch(console.error);
+
+  return; // ✅ สำคัญ
 }
 
 /* ===== เช็คเคสตัวเอง ===== */
@@ -452,29 +556,26 @@ if (i.customId === 'check_my_case') {
 if (i.customId === 'mycase_this_week') {
   await i.deferReply({ ephemeral: true });
 
-  const { start, end } = getThisWeekRange();
-
-  const formatThaiDate = (d) =>
-    d.toLocaleDateString('th-TH', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric'
-    });
-
-  const rangeText = `${formatThaiDate(start)} ถึง ${formatThaiDate(end)}`;
+  // ✅ ใช้เวลาไทยเท่านั้น
+  const { start, end } = getThaiWeekRange();
 
   const cases = loadCases();
 
+  // ✅ กรองเคสของตัวเอง + อยู่ในช่วงอาทิตย์นี้
   const myCases = cases.filter(c => {
     const isOfficer = c.officer === i.user.id;
     const isHelper = c.helpers?.includes(i.user.id);
     if (!isOfficer && !isHelper) return false;
     if (!c.createdAt) return false;
 
-  const caseDate = new Date(c.createdAt);
-  return caseDate >= start && caseDate <= end;
+    const caseTime = c.createdAt; // timestamp
+    return (
+      caseTime >= start.getTime() &&
+      caseTime <= end.getTime()
+    );
   });
 
+  // ✅ นับเคส
   const count = {
     normal: { officer: 0, helper: 0 },
     take2: { officer: 0, helper: 0 },
@@ -487,6 +588,9 @@ if (i.customId === 'mycase_this_week') {
     if (c.officer === i.user.id) count[c.type].officer++;
     if (c.helpers?.includes(i.user.id)) count[c.type].helper++;
   }
+
+  // ✅ แสดงช่วงเวลา (เวลาไทย)
+  const rangeText = `${formatThaiDate(start)} ถึง ${formatThaiDate(end)}`;
 
   const embed = new EmbedBuilder()
     .setColor(0x2ecc71)
@@ -535,11 +639,13 @@ if (i.customId === 'mycase_this_week') {
         inline: false
       }
     )
-    .setFooter({ text: 'Bot Police • สรุปสัปดาห์อัตโนมัติ' })
-    .setTimestamp();
+     .setFooter({
+      text: `Bot Police • วันนี้ ${formatThaiDateTime(getThaiNow())}`
+    });
 
   return i.editReply({ embeds: [embed] });
 }
+/* เช็คเคสทั้งหมด*/
 /* ===== เช็คทั้งหมด ===== */
 if (i.customId === 'mycase_all') {
   await i.deferReply({ ephemeral: true });
@@ -1287,23 +1393,63 @@ function exportDutyExcel() {
   });
 }
 
-  } catch (err) {
-    console.error('INTERACTION ERROR:', err);
-    if (interaction.isRepliable()) {
-  try {
-    if (interaction.deferred || interaction.replied) {
-      await interaction.followUp({ content: '❌ เกิดข้อผิดพลาด', ephemeral: true });
-    } else {
-      await interaction.editReply({ content: '❌ เกิดข้อผิดพลาด', ephemeral: true });
+/* ===== ADMIN CLEAR ALL CASES ===== */
+if (
+  interaction.isButton() &&
+  interaction.customId === 'admin_clear_all_cases'
+) {
+  // 🔐 เช็ค ADMIN
+  if (
+    !interaction.member.permissions.has(
+      PermissionFlagsBits.Administrator
+    )
+  ) {
+    return interaction.reply({
+      content: '❌ เฉพาะ ADMIN เท่านั้น',
+      ephemeral: true
+    });
+  }
+
+  await interaction.deferReply({ ephemeral: true });
+
+  /* 🧹 ลบข้อมูลเคสทั้งหมด */
+  saveCases([]);
+
+  /* 🗑️ ลบข้อความ log */
+  const logChannel =
+    await interaction.guild.channels.fetch(LOG_CHANNEL_ID);
+
+  let deleted = 0;
+  let fetched;
+
+  do {
+    fetched = await logChannel.messages.fetch({ limit: 100 });
+    if (!fetched.size) break;
+
+    for (const msg of fetched.values()) {
+      await msg.delete().catch(() => {});
+      deleted++;
     }
-  } catch {}
+  } while (fetched.size >= 2);
+
+  return interaction.editReply(
+    `🧹 ลบเคสทั้งหมดเรียบร้อย\n🗑️ ลบ log ไป ${deleted} ข้อความ`
+  );
 }
 
+  } catch (err) {
+    console.error('INTERACTION ERROR:', err);
+    if (interaction?.deferred) {
+  try {
+    await interaction.editReply({ content: '❌ เกิดข้อผิดพลาด' });
+  } catch {}
+}
   }
 });
 exportDutyExcel()
   .then(file => console.log('📊 Export สำเร็จ:', file))
   .catch(err => console.error('❌ Export ล้มเหลว:', err.message));
+  
 /* ================= LOGIN ================= */
 if (!process.env.DISCORD_TOKEN) {
   console.error('❌ DISCORD_TOKEN is missing!');
