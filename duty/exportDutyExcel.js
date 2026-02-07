@@ -2,7 +2,7 @@ const path = require('path');
 const XLSX = require('xlsx');
 const sqlite3 = require('sqlite3').verbose();
 
-module.exports = function exportDutyExcel() {
+module.exports = function exportDutyExcelLocal() {
   return new Promise((resolve, reject) => {
     const dbPath = path.join(__dirname, 'duty.db');
     const db = new sqlite3.Database(dbPath);
@@ -47,3 +47,4 @@ module.exports = function exportDutyExcel() {
     );
   });
 };
+exportDutyExcelLocal()

@@ -10,22 +10,8 @@ app.get('/', (req, res) => {
 app.listen(process.env.PORT || 3000, () => {
   console.log('Web server ready');
 });
-function formatThaiTimeFromUTC(dateInput) {
-  return new Intl.DateTimeFormat('th-TH', {
-    timeZone: 'Asia/Bangkok',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: false
-  }).format(new Date(dateInput));
-}
 
 /* ================= CONFIG ================= */
-const CASE_CATEGORY_ID = '1461297109088075947';
-const POLICE_ROLE_ID = '1461296754916851889';
 const LOG_CHANNEL_ID = '1469342649319162081';
 const APPROVE_CHANNEL_ID = '1469342758668992594';
 const CASE_LEADER_ROLE_ID = '1464250545924739207';
@@ -64,6 +50,14 @@ async function getMemberName(guild, userId) {
     return `ไม่พบผู้ใช้ (${userId})`;
   }
 }
+function getThaiISOString() {
+  const now = new Date();
+  const thaiTime = new Date(
+    now.toLocaleString("en-US", { timeZone: "Asia/Bangkok" })
+  );
+  return thaiTime.toISOString();
+}
+
 
 /* ================= CLIENT ================= */
 const client = new Client({
@@ -176,7 +170,6 @@ async function createCaseChannel(interaction, caseType) {
       { id: guild.roles.everyone, allow: [PermissionFlagsBits.ViewChannel] }
     ]
   });
-  await channel.setParent('1461297109088075947');
 
   caseRooms.set(channel.id, {
     ownerId: user.id,
@@ -288,7 +281,7 @@ function formatThaiNow(timestamp = Date.now()) {
   }).format(new Date(timestamp));
 }
 
-const thaiTimeText = formatThaiTimeFromUTC(i.createdTimestamp);
+const thaiTimeText = formatThaiNow(i.createdTimestamp);
 
 const embed = new EmbedBuilder()
   .setColor(0xf1c40f)
@@ -341,6 +334,7 @@ if (i.isButton() && i.customId === 'confirm_submit') {
     type: room.caseType,
     helpers: [...room.tagged.keys()],
     createdAt: new Date().toISOString(), // UTC มาตรฐาน
+
     imageUrl: room.imageUrl
   };
 
@@ -348,7 +342,15 @@ if (i.isButton() && i.customId === 'confirm_submit') {
     newCase.helpers.length > 0
       ? newCase.helpers.map(id => `<@${id}>`).join(', ')
       : 'ไม่มี';
-const thaiTimeText = formatThaiTimeFromUTC(newCase.createdAt);
+const thaiTimeText = new Date().toLocaleString('th-TH', {
+  timeZone: 'Asia/Bangkok',
+  year: 'numeric',
+  month: 'numeric',
+  day: 'numeric',
+  hour: '2-digit',
+  minute: '2-digit',
+  second: '2-digit'
+});
 
   const embed = new EmbedBuilder()
     .setColor(0x2ecc71)
@@ -900,10 +902,11 @@ if (interaction.isButton() && interaction.customId === 'export_excel') {
         เลขคดี: `คดี-${c.type}-${c.id}`,
         คนลงคดี: officerName,
         ผู้ช่วยเหลือ: helperNames,
-        วันที่บันทึก: formatThaiTimeFromUTC(c.createdAt),
+        วันที่บันทึก: formatThaiTime(created),
         ลิงก์คดี: `https://discord.com/channels/${interaction.guild.id}/${LOG_CHANNEL_ID}/${c.logMessageId}`
       });
 
+      /* ---------- Count by officer ---------- */
      /* ---------- Count by officer ---------- */
 if (!countByOfficer[officerName]) {
   countByOfficer[officerName] = {
