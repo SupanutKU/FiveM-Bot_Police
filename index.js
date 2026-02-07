@@ -52,9 +52,6 @@ async function getMemberName(guild, userId) {
     return `ไม่พบผู้ใช้ (${userId})`;
   }
 }
-function getUTCISOString() {
-  return new Date().toISOString(); // UTC แท้
-}
 
 /* ================= CLIENT ================= */
 const client = new Client({
