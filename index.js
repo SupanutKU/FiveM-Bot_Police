@@ -119,7 +119,13 @@ function getThisWeekRange() {
 
   return { start, end };
 }
-
+function formatThaiDate(date) {
+  return date.toLocaleDateString('th-TH', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric'
+  });
+}
 
 function parseThaiDate(str) {
   if (!str || typeof str !== 'string') return null;
@@ -480,38 +486,40 @@ const count = {
   }
 }
 
+const embed = new EmbedBuilder()
+  .setColor(0x2ecc71)
+  .setAuthor({
+    name: `📊 สรุปเคสของ ${i.user.username}`,
+    iconURL: i.user.displayAvatarURL()
+  })
+  .setThumbnail(i.user.displayAvatarURL())
+  .setDescription(
+    `📅 **ช่วงเวลา:** ${rangeText}\n\n` +
 
-  const embed = new EmbedBuilder()
-    .setColor(0x2ecc71)
-    .setTitle(`📆 เคสของคุณ (สัปดาห์นี้)`)
-    .setAuthor({
-      name: i.user.username,
-      iconURL: i.user.displayAvatarURL()
-    })
-    .addFields(
-  {
-    name: '📁 คดีปกติ',
-    value: `👮 ${count.normal.officer} | 🛠 ${count.normal.helper}`,
-    inline: true
-  },
-  {
-    name: '✌️ Take2',
-    value: `👮 ${count.take2.officer} | 🛠 ${count.take2.helper}`,
-    inline: true
-  },
-  {
-    name: '🔴 ส้ม-แดง',
-    value: `👮 ${count.orange_red.officer} | 🛠 ${count.orange_red.helper}`,
-    inline: true
-  },
-  {
-    name: '🏪 งัดร้าน',
-    value: `👮 ${count.store.officer} | 🛠 ${count.store.helper}`,
-    inline: true
-  },
-  { name: '📊 รวมทั้งหมด', value: `${myCases.length}` }
-);
+    `📁 **คดีปกติ**\n` +
+    `👮 ลงเอง: ${count.normal.officer}\n` +
+    `🛠 ผู้ช่วย: ${count.normal.helper}\n` +
+    `รวม: ${count.normal.officer + count.normal.helper}\n\n` +
 
+    `✌️ **Take2**\n` +
+    `👮 ลงเอง: ${count.take2.officer}\n` +
+    `🛠 ผู้ช่วย: ${count.take2.helper}\n` +
+    `รวม: ${count.take2.officer + count.take2.helper}\n\n` +
+
+    `🔴 **ส้ม-แดง**\n` +
+    `👮 ลงเอง: ${count.orange_red.officer}\n` +
+    `🛠 ผู้ช่วย: ${count.orange_red.helper}\n` +
+    `รวม: ${count.orange_red.officer + count.orange_red.helper}\n\n` +
+
+    `🏪 **งัดร้าน**\n` +
+    `👮 ลงเอง: ${count.store.officer}\n` +
+    `🛠 ผู้ช่วย: ${count.store.helper}\n` +
+    `รวม: ${count.store.officer + count.store.helper}\n\n` +
+
+    `📊 **รวมทั้งหมด:** ${myCases.length} เคส`
+  )
+  .setFooter({ text: 'Bot Police • สรุปสัปดาห์อัตโนมัติ' })
+  .setTimestamp();
 
   return safeEdit(i, { embeds: [embed] });
 }
