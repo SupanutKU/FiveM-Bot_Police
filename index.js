@@ -451,6 +451,7 @@ if (i.customId === 'check_my_case') {
 }
 
 /* ===== สัปดาห์นี้ ===== */
+/* ===== สัปดาห์นี้ ===== */
 if (i.customId === 'mycase_this_week') {
   await i.deferReply({ ephemeral: true });
 
@@ -485,12 +486,12 @@ if (i.customId === 'mycase_this_week') {
   };
 
   for (const c of myCases) {
-    if (!count[c.type]) continue;
+    if (!count[c.type]) continue; // กัน error
     if (c.officer === i.user.id) count[c.type].officer++;
     if (c.helpers?.includes(i.user.id)) count[c.type].helper++;
   }
 
-  // ✅ รวมต่อประเภท (ตามภาพที่ต้องการ)
+  // รวมต่อประเภท
   const totalByType = {
     normal: count.normal.officer + count.normal.helper,
     take2: count.take2.officer + count.take2.helper,
@@ -536,7 +537,7 @@ if (i.customId === 'mycase_all') {
   };
 
   for (const c of myCases) {
-    if (!count[c.type]) continue;
+    if (!count[c.type]) continue; // กัน error
     if (c.officer === i.user.id) count[c.type].officer++;
     else if (c.helpers?.includes(i.user.id)) count[c.type].helper++;
   }
