@@ -574,14 +574,29 @@ if (i.customId === 'mycase_this_week') {
 
   const cases = loadCases();
 
-  // ✅ กรองเคสของตัวเอง + อยู่ในช่วงอาทิตย์นี้
+  // ✅ กรองเคสของตัวเอง + อยู่ในช่วงสัปดาห์นี้ (แก้เรื่องเวลาแล้ว)
   const myCases = cases.filter(c => {
     const isOfficer = c.officer === i.user.id;
     const isHelper = c.helpers?.includes(i.user.id);
     if (!isOfficer && !isHelper) return false;
     if (!c.createdAt) return false;
 
-    const caseTime = c.createdAt; // timestamp
+    let caseTime;
+
+    // ✅ รองรับ createdAt ทุกแบบ
+    if (typeof c.createdAt === 'number') {
+      // timestamp (ms)
+      caseTime = c.createdAt;
+    } else if (c.createdAt instanceof Date) {
+      caseTime = c.createdAt.getTime();
+    } else if (typeof c.createdAt === 'string') {
+      const parsed = new Date(c.createdAt);
+      if (isNaN(parsed)) return false;
+      caseTime = parsed.getTime();
+    } else {
+      return false;
+    }
+
     return (
       caseTime >= start.getTime() &&
       caseTime <= end.getTime()
@@ -652,12 +667,13 @@ if (i.customId === 'mycase_this_week') {
         inline: false
       }
     )
-     .setFooter({
+    .setFooter({
       text: `Bot Police • วันนี้ ${formatThaiDateTime(getThaiNow())}`
     });
 
   return i.editReply({ embeds: [embed] });
 }
+
 /* เช็คเคสทั้งหมด*/
 /* ===== เช็คทั้งหมด ===== */
 if (i.customId === 'mycase_all') {
