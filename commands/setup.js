@@ -11,8 +11,6 @@ module.exports = {
     .setDescription('เปิดเมนูระบบคดี'),
 
   async execute(interaction) {
-    // ⭐ สำคัญมาก ป้องกัน InteractionNotReplied
-    await interaction.deferReply({ ephemeral: true });
 
     /* ================= ROW 1 : ลงคดี ================= */
     const row1 = new ActionRowBuilder().addComponents(
@@ -69,9 +67,10 @@ module.exports = {
     );
 
     // ✅ ตอบ interaction แค่ครั้งเดียว
-    await interaction.editReply({
+    await interaction.reply({
       content: 'เลือกปุ่มด้านล่างเพื่อดำเนินการ:',
-      components: [row1, row2, row3]
+      components: [row1, row2, row3],
+      ephemeral: false
     });
   }
 };
