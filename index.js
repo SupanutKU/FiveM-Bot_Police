@@ -349,6 +349,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
   try {
     // ===== Slash Command Handler =====
 if (interaction.isChatInputCommand()) {
+
   const command = client.commands.get(interaction.commandName);
   if (!command) return;
 
@@ -356,19 +357,11 @@ if (interaction.isChatInputCommand()) {
     await command.execute(interaction);
   } catch (error) {
     console.error(error);
-
-    // 🔒 ป้องกัน InteractionNotReplied
-    if (!interaction.replied && !interaction.deferred) {
-      await interaction.reply({
-        content: '❌ เกิดข้อผิดพลาดขณะรันคำสั่ง',
-        ephemeral: true
-      });
-    }
+    await interaction.editReply({
+      content: '❌ เกิดข้อผิดพลาดขณะรันคำสั่ง'
+    });
   }
-
-  return; // ✅ สำคัญมาก กันไม่ให้ไหลไปโดน logic อื่น
 }
-
 
     const i = interaction;
 
@@ -381,7 +374,7 @@ if (interaction.isChatInputCommand()) {
     };
 
     /* ===== CREATE CASE ===== */
-    if (i.isButton() && caseMap[i.customId]) {
+    if (caseMap[i.customId]) {
       await i.deferReply({ ephemeral: true });
       return createCaseChannel(i, caseMap[i.customId]);
     }
@@ -424,18 +417,18 @@ if (i.isButton() && i.customId === 'submit_case') {
       .setStyle(ButtonStyle.Secondary)
   );
 
-  // ⚠️ ตรงนี้ reply ไปแล้ว
   return safeReply(i, {
-    content: '📤 กรุณายืนยันการส่งคดี',
-    components: [row],
-    ephemeral: true
-  });
+  content: '📤 กรุณายืนยันการส่งคดี',
+  components: [row],
+  ephemeral: true
+});
+
 }
+
 
 /* ===== CONFIRM SUBMIT ===== */
 if (i.isButton() && i.customId === 'confirm_submit') {
-  // ❌ ห้าม defer แล้ว
-  // เพราะ interaction นี้เคย reply มาแล้ว
+  await i.deferReply({ ephemeral: true });
 
   const room = caseRooms.get(i.channel.id);
   if (!room) {
@@ -481,13 +474,11 @@ if (i.isButton() && i.customId === 'confirm_submit') {
     `📌 บันทึกคดีแล้ว\n🔗 https://discord.com/channels/${i.guild.id}/${LOG_CHANNEL_ID}/${logMsg.id}`
   );
 
-  caseRooms.delete(i.channel.id);
+  caseRooms.delete(i.channel.id); // ✅ สำคัญมาก
 
   setTimeout(() => {
     i.channel.delete().catch(() => {});
   }, 3000);
-
-  return;
 }
 
 /* ===== DELETE CASE CHANNEL ===== */
@@ -499,6 +490,7 @@ if (i.isButton() && i.customId === 'delete_case') {
     return i.editReply('❌ ห้องนี้ไม่ใช่ห้องคดี');
   }
 
+  // 🔐 อนุญาตเฉพาะเจ้าของคดี หรือ POLICE
   const isOwner = i.user.id === room.ownerId;
   const isPolice = i.member.roles.cache.has(POLICE_ROLE_ID);
 
@@ -508,9 +500,8 @@ if (i.isButton() && i.customId === 'delete_case') {
 
   await i.editReply('🗑️ กำลังลบห้อง...');
   await i.channel.delete().catch(console.error);
-
-  return; // ✅ สำคัญ
 }
+
 
 /* ===== เช็คเคสตัวเอง ===== */
 if (i.customId === 'check_my_case') {
@@ -1370,50 +1361,6 @@ function exportDutyExcel() {
       resolve(filePath);
     });
   });
-}
-
-/* ===== ADMIN CLEAR ALL CASES ===== */
-if (
-  interaction.isButton() &&
-  interaction.customId === 'admin_clear_all_cases'
-) {
-  // 🔐 เช็ค ADMIN
-  if (
-    !interaction.member.permissions.has(
-      PermissionFlagsBits.Administrator
-    )
-  ) {
-    return interaction.reply({
-      content: '❌ เฉพาะ ADMIN เท่านั้น',
-      ephemeral: true
-    });
-  }
-
-  await interaction.deferReply({ ephemeral: true });
-
-  /* 🧹 ลบข้อมูลเคสทั้งหมด */
-  saveCases([]);
-
-  /* 🗑️ ลบข้อความ log */
-  const logChannel =
-    await interaction.guild.channels.fetch(LOG_CHANNEL_ID);
-
-  let deleted = 0;
-  let fetched;
-
-  do {
-    fetched = await logChannel.messages.fetch({ limit: 100 });
-    if (!fetched.size) break;
-
-    for (const msg of fetched.values()) {
-      await msg.delete().catch(() => {});
-      deleted++;
-    }
-  } while (fetched.size >= 2);
-
-  return interaction.editReply(
-    `🧹 ลบเคสทั้งหมดเรียบร้อย\n🗑️ ลบ log ไป ${deleted} ข้อความ`
-  );
 }
 
   } catch (err) {
