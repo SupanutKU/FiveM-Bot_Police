@@ -408,45 +408,35 @@ if (interaction.isChatInputCommand()) {
 if (i.isButton() && i.customId === 'submit_case') {
   const room = caseRooms.get(i.channel.id);
   if (!room) {
-    return safeReply(i, {
-      content: '❌ ห้องนี้ไม่ใช่ห้องคดี',
-      ephemeral: true
-    });
+    return safeReply(i, { content: '❌ ห้องนี้ไม่ใช่ห้องคดี', ephemeral: true });
   }
 
   const isOwner = i.user.id === room.ownerId;
   const isHelper = room.tagged.has(i.user.id);
 
   if (!isOwner && !isHelper) {
-    return safeReply(i, {
-      content: '❌ เฉพาะเจ้าของคดีหรือผู้ช่วยเท่านั้น',
-      ephemeral: true
-    });
+    return safeReply(i, { content: '❌ เฉพาะเจ้าของคดีหรือผู้ช่วยเท่านั้น', ephemeral: true });
   }
 
   if (!room.hasImage) {
-    return safeReply(i, {
-      content: '❌ ต้องส่งรูปก่อนถึงจะส่งคดีได้',
-      ephemeral: true
-    });
+    return safeReply(i, { content: '❌ ต้องส่งรูปก่อนถึงจะส่งคดีได้', ephemeral: true });
   }
 
   const row = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
-      // 🔥 ผูก channel.id เข้าไป
       .setCustomId(`confirm_submit_${i.channel.id}`)
       .setLabel('✅ ยืนยันส่งคดี')
       .setStyle(ButtonStyle.Success),
     new ButtonBuilder()
-      .setCustomId('cancel_submit')
+      .setCustomId(`cancel_submit_${i.channel.id}`) // ✅ ต้องมี channelId
       .setLabel('❌ ยกเลิก')
       .setStyle(ButtonStyle.Secondary)
   );
 
-  return safeReply(i, {
+  // ❌ ไม่ใช้ ephemeral
+  return i.reply({
     content: '📤 กรุณายืนยันการส่งคดี',
-    components: [row],
-    ephemeral: true
+    components: [row]
   });
 }
 /* ===== CANCEL SUBMIT ===== */
@@ -456,19 +446,13 @@ if (i.isButton() && i.customId.startsWith('cancel_submit_')) {
   const room = caseRooms.get(channelId);
 
   if (!room) {
-    return i.update({
-      content: '❌ ไม่พบข้อมูลคดี',
-      components: []
-    });
+    return i.update({ content: '❌ ไม่พบข้อมูลคดี', components: [] });
   }
 
-  // ✅ ตอบ interaction แบบปุ่ม
-  await i.update({
+  return i.update({
     content: '❌ ยกเลิกการส่งคดีเรียบร้อย',
-    components: [] // ปิดปุ่ม
+    components: []
   });
-
-  return;
 }
 
 /* ===== CONFIRM SUBMIT ===== */
@@ -538,7 +522,6 @@ if (i.isButton() && i.customId.startsWith('confirm_submit_')) {
 
   return;
 }
-
 
 /* ===== DELETE CASE CHANNEL ===== */
 if (i.isButton() && i.customId === 'delete_case') {
