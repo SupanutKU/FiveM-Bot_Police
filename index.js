@@ -19,6 +19,8 @@ const ALLOWED_ROLES = [
   '1461318666741092495',
   '1464250545924739207',
 ];
+const POLICE_ROLE_ID = "1461296754916851889";
+const POLICE_CATEGORY_ID = "1461297109088075947";
 
 /* ================= DISCORD ================= */
 const {
@@ -143,38 +145,65 @@ const caseRooms = new Map();
 client.once(Events.ClientReady, () => {
   console.log(`✅ Logged in as ${client.user.tag}`);
 });
+async function lockPoliceCategory(guild) {
+  const category = await guild.channels.fetch(POLICE_CATEGORY_ID);
+  if (!category) return;
+
+  console.log('🔒 POLICE category locked');
+}
 
 /* ================= CREATE CASE CHANNEL ================= */
 async function createCaseChannel(interaction, caseType) {
   const guild = interaction.guild;
+  await lockPoliceCategory(guild);
   const user = interaction.user;
 
-  const channel = await guild.channels.create({
-    name: `📁-คดี-${user.username}`,
-    type: ChannelType.GuildText,
-    permissionOverwrites: [
-      { id: guild.roles.everyone, allow: [PermissionFlagsBits.ViewChannel] }
-    ]
-  });
+  const channel = await interaction.guild.channels.create({
+  name: `📁-คดี-${interaction.user.username}`,
+  type: ChannelType.GuildText,
+  parent: '1461297109088075947', // หมวด POLICE
+  permissionOverwrites: [
+    // ❌ ทุกคนห้ามเห็น
+    {
+      id: interaction.guild.roles.everyone.id,
+      deny: [
+        PermissionFlagsBits.ViewChannel
+      ]
+    },
 
-  caseRooms.set(channel.id, {
-    ownerId: user.id,
-    hasImage: false,
-    imageUrl: null,
-    tagged: new Map(),
-    caseType
-  });
+    // ✅ ยศ POLICE เห็น + ใช้งาน
+    {
+      id: '1461296754916851889', // POLICE ROLE
+      allow: [
+        PermissionFlagsBits.ViewChannel,
+        PermissionFlagsBits.SendMessages,
+        PermissionFlagsBits.ReadMessageHistory
+      ]
+    },
 
-  const row = new ActionRowBuilder().addComponents(
-    new ButtonBuilder()
-      .setCustomId('submit_case')
-      .setLabel('📨 ส่งคดี')
-      .setStyle(ButtonStyle.Success),
-    new ButtonBuilder()
-      .setCustomId('delete_case')
-      .setLabel('🗑 ลบห้อง')
-      .setStyle(ButtonStyle.Danger)
-  );
+    // ✅ เจ้าของคดี
+    {
+      id: interaction.user.id,
+      allow: [
+        PermissionFlagsBits.ViewChannel,
+        PermissionFlagsBits.SendMessages,
+        PermissionFlagsBits.ReadMessageHistory,
+        PermissionFlagsBits.ManageChannels
+      ]
+    },
+
+    // 🤖 bot police (สำคัญมาก ไม่งั้นลบไม่ได้)
+    {
+      id: interaction.client.user.id,
+      allow: [
+        PermissionFlagsBits.ViewChannel,
+        PermissionFlagsBits.SendMessages,
+        PermissionFlagsBits.ReadMessageHistory,
+        PermissionFlagsBits.ManageChannels
+      ]
+    }
+  ]
+});
 
   await interaction.editReply(`✅ สร้างห้อง ${channel} เรียบร้อย`);
   await channel.send({
@@ -332,7 +361,14 @@ if (i.isButton() && i.customId === 'confirm_submit') {
   cases.push(newCase);
   saveCases(cases);
 
-  caseRooms.delete(i.channel.id);
+  if (interaction.customId === 'delete_case') {
+  await interaction.deferReply({ ephemeral: true });
+
+  const channel = interaction.channel;
+
+  await channel.delete();
+}
+
 
   await i.editReply('✅ ส่งคดีเรียบร้อย กำลังปิดห้อง...');
   await i.channel.send('📁 คดีถูกบันทึกแล้ว');
