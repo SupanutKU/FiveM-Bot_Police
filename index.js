@@ -338,7 +338,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
       return createCaseChannel(i, caseMap[i.customId]);
     }
 
-    /* ===== SUBMIT CASE ===== */
+/* ===== SUBMIT CASE ===== */
 if (i.isButton() && i.customId === 'submit_case') {
   const room = caseRooms.get(i.channel.id);
   if (!room) {
@@ -367,7 +367,8 @@ if (i.isButton() && i.customId === 'submit_case') {
 
   const row = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
-      .setCustomId('confirm_submit')
+      // 🔑 ฝัง channelId
+      .setCustomId(`confirm_submit:${i.channel.id}`)
       .setLabel('✅ ยืนยันส่งคดี')
       .setStyle(ButtonStyle.Success),
     new ButtonBuilder()
@@ -377,22 +378,25 @@ if (i.isButton() && i.customId === 'submit_case') {
   );
 
   return safeReply(i, {
-  content: '📤 กรุณายืนยันการส่งคดี',
-  components: [row],
-  ephemeral: true
-});
-
+    content: '📤 กรุณายืนยันการส่งคดี',
+    components: [row],
+    ephemeral: true
+  });
 }
 
 /* ===== CONFIRM SUBMIT ===== */
-if (i.isButton() && i.customId === 'confirm_submit') {
+if (i.isButton() && i.customId.startsWith('confirm_submit')) {
   await i.deferReply({ ephemeral: true });
 
-  const room = caseRooms.get(i.channel.id);
+  // 🔑 ดึง channelId จากปุ่ม
+  const channelId = i.customId.split(':')[1];
+
+  const room = caseRooms.get(channelId);
   if (!room) {
     return i.editReply('❌ ไม่พบข้อมูลคดี');
   }
 
+  const caseChannel = await i.guild.channels.fetch(channelId);
   const cases = loadCases();
 
   const newCase = {
@@ -400,7 +404,7 @@ if (i.isButton() && i.customId === 'confirm_submit') {
     officer: room.ownerId,
     type: room.caseType,
     helpers: [...room.tagged],
-    createdAt: getUTCISOString(),
+    createdAt: Date.now(),
     imageUrl: room.imageUrl
   };
 
@@ -409,15 +413,16 @@ if (i.isButton() && i.customId === 'confirm_submit') {
       ? newCase.helpers.map(id => `<@${id}>`).join(', ')
       : 'ไม่มี';
 
-const embed = buildCaseLogEmbed({
-  caseType: newCase.type,
-  officerId: newCase.officer,
-  helpers: newCase.helpers,
-  imageUrl: newCase.imageUrl,
-  createdAt: newCase.createdAt,
-  channelName: i.channel.name
-});
-
+  const embed = new EmbedBuilder()
+    .setColor(0x2ecc71)
+    .setTitle('📁 บันทึกคดี')
+    .setDescription(
+      `👮 คนลงคดี\n<@${newCase.officer}>\n\n` +
+      `🛠 ผู้ช่วย\n${helpersText}\n\n` +
+      `🕒 เวลา\n${formatThaiDateTime(newCase.createdAt)}`
+    )
+    .setImage(newCase.imageUrl)
+    .setFooter({ text: 'Bot Police' });
 
   const logChannel = await i.guild.channels.fetch(LOG_CHANNEL_ID);
   const logMsg = await logChannel.send({ embeds: [embed] });
@@ -427,14 +432,17 @@ const embed = buildCaseLogEmbed({
   saveCases(cases);
 
   await i.editReply('✅ ส่งคดีเรียบร้อย');
-  await i.channel.send(
+
+  await caseChannel.send(
     `📌 บันทึกคดีแล้ว\n🔗 https://discord.com/channels/${i.guild.id}/${LOG_CHANNEL_ID}/${logMsg.id}`
   );
 
-  caseRooms.delete(i.channel.id); // ✅ สำคัญมาก
+  // 🧹 ล้างข้อมูล
+  caseRooms.delete(channelId);
 
+  // 🗑 ลบห้องอัตโนมัติ
   setTimeout(() => {
-    i.channel.delete().catch(() => {});
+    caseChannel.delete().catch(() => {});
   }, 3000);
 }
 
