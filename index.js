@@ -138,7 +138,17 @@ function parseThaiDate(str) {
   return new Date(y - 543, m - 1, d);
 }
 
-
+function formatThaiDateTime(dateInput) {
+  return new Date(dateInput).toLocaleString('th-TH', {
+    timeZone: 'Asia/Bangkok',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit'
+  });
+}
 
 function saveCases(cases) {
   fs.writeFileSync(DATA_PATH, JSON.stringify({ cases }, null, 2));
@@ -383,7 +393,7 @@ if (i.isButton() && i.customId === 'confirm_submit') {
     .setDescription(
       `👮 คนลงคดี\n<@${newCase.officer}>\n\n` +
       `🛠 ผู้ช่วย\n${helpersText}\n\n` +
-      `🕒 เวลา\n${new Date().toLocaleString('th-TH')}`
+      `🕒 เวลา\n${formatThaiDateTime(newCase.createdAt)}`
     )
     .setImage(newCase.imageUrl)
     .setFooter({ text: 'Bot Police' });
@@ -429,7 +439,7 @@ if (i.isButton() && i.customId === 'delete_case') {
 }
 
 
-    /* ===== เช็คเคสตัวเอง ===== */
+/* ===== เช็คเคสตัวเอง ===== */
 if (i.customId === 'check_my_case') {
   const row = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
@@ -443,142 +453,183 @@ if (i.customId === 'check_my_case') {
       .setStyle(ButtonStyle.Secondary)
   );
 
-  return safeReply(i,{
+  return safeReply(i, {
     content: 'กรุณาเลือกรูปแบบการเช็คเคส:',
     components: [row],
     ephemeral: true
   });
 }
+/* ===== สัปดาห์นี้ ===== */
 if (i.customId === 'mycase_this_week') {
   await i.deferReply({ ephemeral: true });
 
   const { start, end } = getThisWeekRange();
+
+  const formatThaiDate = (d) =>
+    d.toLocaleDateString('th-TH', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
+    });
+
+  const rangeText = `${formatThaiDate(start)} ถึง ${formatThaiDate(end)}`;
+
   const cases = loadCases();
 
-const myCases = cases.filter(c => {
-  const isOfficer = c.officer === i.user.id;
-  const isHelper = c.helpers?.includes(i.user.id);
+  const myCases = cases.filter(c => {
+    const isOfficer = c.officer === i.user.id;
+    const isHelper = c.helpers?.includes(i.user.id);
+    if (!isOfficer && !isHelper) return false;
+    if (!c.createdAt) return false;
 
-  if (!isOfficer && !isHelper) return false;
-  if (!c.createdAt) return false;
+    const caseDate = formatThaiDateTime(c.createdAt)
+    return caseDate >= start && caseDate <= end;
+  });
 
-  const caseDate = new Date(c.createdAt);
-  return caseDate >= start && caseDate <= end;
-});
-
-const count = {
-  normal: { officer: 0, helper: 0 },
-  take2: { officer: 0, helper: 0 },
-  orange_red: { officer: 0, helper: 0 },
-  store: { officer: 0, helper: 0 }
-};
-
+  const count = {
+    normal: { officer: 0, helper: 0 },
+    take2: { officer: 0, helper: 0 },
+    orange_red: { officer: 0, helper: 0 },
+    store: { officer: 0, helper: 0 }
+  };
 
   for (const c of myCases) {
-  if (!count[c.type]) continue;
-
-  if (c.officer === i.user.id) {
-    count[c.type].officer++;
+    if (!count[c.type]) continue;
+    if (c.officer === i.user.id) count[c.type].officer++;
+    if (c.helpers?.includes(i.user.id)) count[c.type].helper++;
   }
 
-  if (c.helpers?.includes(i.user.id)) {
-    count[c.type].helper++;
-  }
-}
-
-const embed = new EmbedBuilder()
-  .setColor(0x2ecc71)
-  .setAuthor({
-    name: `📊 สรุปเคสของ ${i.user.username}`,
-    iconURL: i.user.displayAvatarURL()
-  })
-  .setThumbnail(i.user.displayAvatarURL())
-  .setDescription(
-    `📅 **ช่วงเวลา:** ${rangeText}\n\n` +
-
-    `📁 **คดีปกติ**\n` +
-    `👮 ลงเอง: ${count.normal.officer}\n` +
-    `🛠 ผู้ช่วย: ${count.normal.helper}\n` +
-    `รวม: ${count.normal.officer + count.normal.helper}\n\n` +
-
-    `✌️ **Take2**\n` +
-    `👮 ลงเอง: ${count.take2.officer}\n` +
-    `🛠 ผู้ช่วย: ${count.take2.helper}\n` +
-    `รวม: ${count.take2.officer + count.take2.helper}\n\n` +
-
-    `🔴 **ส้ม-แดง**\n` +
-    `👮 ลงเอง: ${count.orange_red.officer}\n` +
-    `🛠 ผู้ช่วย: ${count.orange_red.helper}\n` +
-    `รวม: ${count.orange_red.officer + count.orange_red.helper}\n\n` +
-
-    `🏪 **งัดร้าน**\n` +
-    `👮 ลงเอง: ${count.store.officer}\n` +
-    `🛠 ผู้ช่วย: ${count.store.helper}\n` +
-    `รวม: ${count.store.officer + count.store.helper}\n\n` +
-
-    `📊 **รวมทั้งหมด:** ${myCases.length} เคส`
-  )
-  .setFooter({ text: 'Bot Police • สรุปสัปดาห์อัตโนมัติ' })
-  .setTimestamp();
+  const embed = new EmbedBuilder()
+    .setColor(0x2ecc71)
+    .setAuthor({
+      name: `📊 สรุปเคสของ ${i.user.username}`,
+      iconURL: i.user.displayAvatarURL()
+    })
+    .setThumbnail(i.user.displayAvatarURL())
+    .setDescription(`📅 **ช่วงเวลา:** ${rangeText}`)
+    .addFields(
+      {
+        name: '📁 คดีปกติ',
+        value:
+          `ลงเอง: ${count.normal.officer}\n` +
+          `ถูกแท็ก: ${count.normal.helper}\n` +
+          `**รวม: ${count.normal.officer + count.normal.helper}**`,
+        inline: true
+      },
+      {
+        name: '✌️ Take2',
+        value:
+          `ลงเอง: ${count.take2.officer}\n` +
+          `ถูกแท็ก: ${count.take2.helper}\n` +
+          `**รวม: ${count.take2.officer + count.take2.helper}**`,
+        inline: true
+      },
+      {
+        name: '🔴 ส้ม-แดง',
+        value:
+          `ลงเอง: ${count.orange_red.officer}\n` +
+          `ถูกแท็ก: ${count.orange_red.helper}\n` +
+          `**รวม: ${count.orange_red.officer + count.orange_red.helper}**`,
+        inline: true
+      },
+      {
+        name: '🏪 งัดร้าน',
+        value:
+          `ลงเอง: ${count.store.officer}\n` +
+          `ถูกแท็ก: ${count.store.helper}\n` +
+          `**รวม: ${count.store.officer + count.store.helper}**`,
+        inline: true
+      },
+      {
+        name: '📊 รวมทั้งหมด',
+        value: `**${myCases.length} เคส**`,
+        inline: false
+      }
+    )
+    .setFooter({ text: 'Bot Police • สรุปสัปดาห์อัตโนมัติ' })
+    .setTimestamp();
 
   return safeEdit(i, { embeds: [embed] });
 }
+/* เช็คเคสทั้งหมด*/
+/* ===== เช็คทั้งหมด ===== */
 if (i.customId === 'mycase_all') {
   await i.deferReply({ ephemeral: true });
 
   const cases = loadCases();
-  const myCases = cases.filter(c =>
-  c.officer === i.user.id || c.helpers?.includes(i.user.id)
-);
 
+  const myCases = cases.filter(c => {
+    const isOfficer = c.officer === i.user.id;
+    const isHelper = c.helpers?.includes(i.user.id);
+    if (!isOfficer && !isHelper) return false;
+    if (!c.createdAt) return false;
+    return true; // ไม่กรองวัน
+  });
 
-const count = {
-  normal: { officer: 0, helper: 0 },
-  take2: { officer: 0, helper: 0 },
-  orange_red: { officer: 0, helper: 0 },
-  store: { officer: 0, helper: 0 }
-};
+  const count = {
+    normal: { officer: 0, helper: 0 },
+    take2: { officer: 0, helper: 0 },
+    orange_red: { officer: 0, helper: 0 },
+    store: { officer: 0, helper: 0 }
+  };
 
-for (const c of myCases) {
-  if (c.officer === i.user.id) {
-    count[c.type].officer++;
-  } else if (c.helpers?.includes(i.user.id)) {
-    count[c.type].helper++;
+  for (const c of myCases) {
+    if (!count[c.type]) continue;
+    if (c.officer === i.user.id) count[c.type].officer++;
+    if (c.helpers?.includes(i.user.id)) count[c.type].helper++;
   }
-}
 
   const embed = new EmbedBuilder()
-    .setColor(0x5865f2)
-    .setTitle('📂 เคสทั้งหมดของคุณ')
+    .setColor(0x3498db)
     .setAuthor({
-      name: i.user.username,
+      name: `📊 สรุปเคสทั้งหมดของ ${i.user.username}`,
       iconURL: i.user.displayAvatarURL()
     })
+    .setThumbnail(i.user.displayAvatarURL())
+    .setDescription(`📂 **ช่วงเวลา:** ทั้งหมด`)
     .addFields(
-  {
-    name: '📁 คดีปกติ',
-    value: `👮 ${count.normal.officer} | 🛠 ${count.normal.helper}`,
-    inline: true
-  },
-  {
-    name: '✌️ Take2',
-    value: `👮 ${count.take2.officer} | 🛠 ${count.take2.helper}`,
-    inline: true
-  },
-  {
-    name: '🔴 ส้ม-แดง',
-    value: `👮 ${count.orange_red.officer} | 🛠 ${count.orange_red.helper}`,
-    inline: true
-  },
-  {
-    name: '🏪 งัดร้าน',
-    value: `👮 ${count.store.officer} | 🛠 ${count.store.helper}`,
-    inline: true
-  },
-  { name: '📊 รวมทั้งหมด', value: `${myCases.length}` }
-);
+      {
+        name: '📁 คดีปกติ',
+        value:
+          `ลงเอง: ${count.normal.officer}\n` +
+          `ถูกแท็ก: ${count.normal.helper}\n` +
+          `**รวม: ${count.normal.officer + count.normal.helper}**`,
+        inline: true
+      },
+      {
+        name: '✌️ Take2',
+        value:
+          `ลงเอง: ${count.take2.officer}\n` +
+          `ถูกแท็ก: ${count.take2.helper}\n` +
+          `**รวม: ${count.take2.officer + count.take2.helper}**`,
+        inline: true
+      },
+      {
+        name: '🔴 ส้ม-แดง',
+        value:
+          `ลงเอง: ${count.orange_red.officer}\n` +
+          `ถูกแท็ก: ${count.orange_red.helper}\n` +
+          `**รวม: ${count.orange_red.officer + count.orange_red.helper}**`,
+        inline: true
+      },
+      {
+        name: '🏪 งัดร้าน',
+        value:
+          `ลงเอง: ${count.store.officer}\n` +
+          `ถูกแท็ก: ${count.store.helper}\n` +
+          `**รวม: ${count.store.officer + count.store.helper}**`,
+        inline: true
+      },
+      {
+        name: '📊 รวมทั้งหมด',
+        value: `**${myCases.length} เคส**`,
+        inline: false
+      }
+    )
+    .setFooter({ text: 'Bot Police • สรุปเคสทั้งหมดอัตโนมัติ' })
+    .setTimestamp();
 
-  return i.editReply({ embeds: [embed] });
+  return safeEdit(i, { embeds: [embed] });
 }
 
     /* ===== ADD HELPER BUTTON ===== */
@@ -940,7 +991,7 @@ if (interaction.isButton() && interaction.customId === 'export_excel') {
         helperNames = arr.join(', ');
       }
 
-      const created = new Date(c.createdAt);
+      const created = formatThaiDateTime(c.createdAt)
       const weekKey = `${created.getFullYear()}-W${Math.ceil(created.getDate() / 7)}`;
       const monthKey = `${created.getFullYear()}-${created.getMonth() + 1}`;
 
@@ -949,7 +1000,7 @@ if (interaction.isButton() && interaction.customId === 'export_excel') {
         เลขคดี: `คดี-${c.type}-${c.id}`,
         คนลงคดี: officerName,
         ผู้ช่วยเหลือ: helperNames,
-        วันที่บันทึก: created.toLocaleString('th-TH'),
+        วันที่บันทึก: formatThaiDateTime(c.createdAt),
         ลิงก์คดี: `https://discord.com/channels/${interaction.guild.id}/${LOG_CHANNEL_ID}/${c.logMessageId}`
       });
 
@@ -1118,6 +1169,8 @@ if (i.customId === 'check_user_personal') {
     components: [row]
   });
 }
+
+/* ===== เมื่อเลือกเจ้าหน้าที่ ===== */
 if (i.isUserSelectMenu() && i.customId === 'select_user_to_check') {
   await i.deferReply({ ephemeral: true });
 
@@ -1125,42 +1178,81 @@ if (i.isUserSelectMenu() && i.customId === 'select_user_to_check') {
   const targetMember = await i.guild.members.fetch(targetUserId);
 
   const cases = loadCases();
-const userCases = cases.filter(c =>
-  c.officer === targetUserId ||
-  c.helpers?.includes(targetUserId)
-);
 
+  const userCases = cases.filter(c => {
+    const isOfficer = c.officer === targetUserId;
+    const isHelper = c.helpers?.includes(targetUserId);
+    if (!isOfficer && !isHelper) return false;
+    if (!c.createdAt) return false;
+    return true;
+  });
 
   const count = {
-    normal: 0,
-    take2: 0,
-    orange_red: 0,
-    store: 0
+    normal: { officer: 0, helper: 0 },
+    take2: { officer: 0, helper: 0 },
+    orange_red: { officer: 0, helper: 0 },
+    store: { officer: 0, helper: 0 }
   };
 
   for (const c of userCases) {
-    if (count[c.type] !== undefined) {
-      count[c.type]++;
-    }
+    if (!count[c.type]) continue;
+    if (c.officer === targetUserId) count[c.type].officer++;
+    if (c.helpers?.includes(targetUserId)) count[c.type].helper++;
   }
 
   const embed = new EmbedBuilder()
     .setColor(0x5865f2)
     .setAuthor({
-      name: `สรุปเคสของ ${targetMember.user.username}`,
+      name: `📊 สรุปเคสของ ${targetMember.user.username}`,
       iconURL: targetMember.user.displayAvatarURL()
     })
+    .setThumbnail(targetMember.user.displayAvatarURL())
+    .setDescription('📂 **ช่วงเวลา:** ทั้งหมด')
     .addFields(
-      { name: '📁 คดีปกติ', value: `${count.normal}`, inline: true },
-      { name: '✌️ Take2', value: `${count.take2}`, inline: true },
-      { name: '🔴 คดีส้ม-แดง', value: `${count.orange_red}`, inline: true },
-      { name: '🏪 งัดร้าน', value: `${count.store}`, inline: true },
-      { name: '📊 รวมทั้งหมด', value: `${userCases.length}` }
+      {
+        name: '📁 คดีปกติ',
+        value:
+          `ลงเอง: ${count.normal.officer}\n` +
+          `ถูกแท็ก: ${count.normal.helper}\n` +
+          `**รวม: ${count.normal.officer + count.normal.helper}**`,
+        inline: true
+      },
+      {
+        name: '✌️ Take2',
+        value:
+          `ลงเอง: ${count.take2.officer}\n` +
+          `ถูกแท็ก: ${count.take2.helper}\n` +
+          `**รวม: ${count.take2.officer + count.take2.helper}**`,
+        inline: true
+      },
+      {
+        name: '🔴 ส้ม-แดง',
+        value:
+          `ลงเอง: ${count.orange_red.officer}\n` +
+          `ถูกแท็ก: ${count.orange_red.helper}\n` +
+          `**รวม: ${count.orange_red.officer + count.orange_red.helper}**`,
+        inline: true
+      },
+      {
+        name: '🏪 งัดร้าน',
+        value:
+          `ลงเอง: ${count.store.officer}\n` +
+          `ถูกแท็ก: ${count.store.helper}\n` +
+          `**รวม: ${count.store.officer + count.store.helper}**`,
+        inline: true
+      },
+      {
+        name: '📊 รวมทั้งหมด',
+        value: `**${userCases.length} เคส**`,
+        inline: false
+      }
     )
-    .setFooter({ text: `ID: ${targetUserId}` });
+    .setFooter({ text: 'Bot Police • สรุปเคสรายบุคคล' })
+    .setTimestamp();
 
   return i.editReply({ embeds: [embed] });
 }
+
 /* ================= DATA ================= */
 function exportDutyExcel() {
   return new Promise((resolve, reject) => {
