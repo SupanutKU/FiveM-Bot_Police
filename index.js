@@ -299,6 +299,25 @@ client.on(Events.MessageCreate, msg => {
     }
   }
 });
+/* ================= DELETE LOG = DELETE CASE ================= */
+client.on(Events.MessageDelete, async (message) => {
+  // สนใจเฉพาะห้อง log เท่านั้น
+  if (!message.guild) return;
+  if (message.channel.id !== LOG_CHANNEL_ID) return;
+
+  const cases = loadCases();
+  const before = cases.length;
+
+  // ลบคดีที่ผูกกับ logMessageId นี้
+  const filteredCases = cases.filter(
+    c => c.logMessageId !== message.id
+  );
+
+  if (filteredCases.length !== before) {
+    saveCases(filteredCases);
+    console.log(`🗑️ ลบคดีที่ผูกกับ log ${message.id} แล้ว`);
+  }
+});
 
 setInterval(async () => {
   const now = Date.now();
