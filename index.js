@@ -1381,4 +1381,39 @@ if (!process.env.DISCORD_TOKEN) {
   process.exit(1);
 }
 
+if (interaction.isButton() && interaction.customId === 'admin_clear_all_cases') {
+  // 🔐 เช็ค ADMIN
+  if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
+    return interaction.reply({
+      content: '❌ เฉพาะ ADMIN เท่านั้น',
+      ephemeral: true
+    });
+  }
+
+  await interaction.deferReply({ ephemeral: true });
+
+  /* ================= ลบข้อมูลเคส ================= */
+  saveCases([]); // ล้าง cases.json ทั้งหมด
+
+  /* ================= ลบ log ในห้อง log ================= */
+  const logChannel = await interaction.guild.channels.fetch(LOG_CHANNEL_ID);
+
+  let deleted = 0;
+  let fetched;
+
+  do {
+    fetched = await logChannel.messages.fetch({ limit: 100 });
+    if (fetched.size === 0) break;
+
+    for (const msg of fetched.values()) {
+      await msg.delete().catch(() => {});
+      deleted++;
+    }
+  } while (fetched.size >= 2);
+
+  await interaction.editReply(
+    `🧹 ลบเคสทั้งหมดเรียบร้อย\n🗑️ ลบ log ไป ${deleted} ข้อความ`
+  );
+}
+
 client.login(process.env.DISCORD_TOKEN);
