@@ -157,7 +157,6 @@ function formatThaiDateTime(input) {
   }).format(date);
 }
 
-
 /* =============================================== */
 
 function parseThaiDate(str) {
@@ -389,7 +388,6 @@ if (interaction.isChatInputCommand()) {
   return; // ✅ สำคัญมาก กันไม่ให้ไหลไปโดน logic อื่น
 }
 
-
     const i = interaction;
 
     /* ===== MAP CUSTOM ID ===== */
@@ -406,7 +404,7 @@ if (interaction.isChatInputCommand()) {
       return createCaseChannel(i, caseMap[i.customId]);
     }
 
-    /* ===== SUBMIT CASE ===== */
+/* ===== SUBMIT CASE ===== */
 if (i.isButton() && i.customId === 'submit_case') {
   const room = caseRooms.get(i.channel.id);
   if (!room) {
@@ -435,7 +433,8 @@ if (i.isButton() && i.customId === 'submit_case') {
 
   const row = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
-      .setCustomId('confirm_submit')
+      // 🔥 ผูก channel.id เข้าไป
+      .setCustomId(`confirm_submit_${i.channel.id}`)
       .setLabel('✅ ยืนยันส่งคดี')
       .setStyle(ButtonStyle.Success),
     new ButtonBuilder()
@@ -444,23 +443,54 @@ if (i.isButton() && i.customId === 'submit_case') {
       .setStyle(ButtonStyle.Secondary)
   );
 
-  // ⚠️ ตรงนี้ reply ไปแล้ว
   return safeReply(i, {
     content: '📤 กรุณายืนยันการส่งคดี',
     components: [row],
     ephemeral: true
   });
 }
+/* ===== CANCEL SUBMIT ===== */
+if (i.isButton() && i.customId.startsWith('cancel_submit_')) {
+
+  const channelId = i.customId.replace('cancel_submit_', '');
+  const room = caseRooms.get(channelId);
+
+  if (!room) {
+    return i.update({
+      content: '❌ ไม่พบข้อมูลคดี',
+      components: []
+    });
+  }
+
+  // ✅ ตอบ interaction แบบปุ่ม
+  await i.update({
+    content: '❌ ยกเลิกการส่งคดีเรียบร้อย',
+    components: [] // ปิดปุ่ม
+  });
+
+  return;
+}
 
 /* ===== CONFIRM SUBMIT ===== */
-if (i.isButton() && i.customId === 'confirm_submit') {
-  // ❌ ห้าม defer แล้ว
-  // เพราะ interaction นี้เคย reply มาแล้ว
+if (i.isButton() && i.customId.startsWith('confirm_submit_')) {
 
-  const room = caseRooms.get(i.channel.id);
+  const channelId = i.customId.replace('confirm_submit_', '');
+  const room = caseRooms.get(channelId);
+
   if (!room) {
-    return i.editReply('❌ ไม่พบข้อมูลคดี');
+    return i.update({
+      content: '❌ ไม่พบข้อมูลคดี',
+      components: []
+    });
   }
+
+  // ✅ ตอบ interaction ของปุ่มให้ Discord ก่อน
+  await i.update({
+    content: '⏳ กำลังบันทึกคดี...',
+    components: [] // ปิดปุ่มทันที
+  });
+
+  /* ===== งานหนัก เริ่มหลังจากนี้ ===== */
 
   const cases = loadCases();
 
@@ -496,12 +526,11 @@ if (i.isButton() && i.customId === 'confirm_submit') {
   cases.push(newCase);
   saveCases(cases);
 
-  await i.editReply('✅ ส่งคดีเรียบร้อย');
   await i.channel.send(
     `📌 บันทึกคดีแล้ว\n🔗 https://discord.com/channels/${i.guild.id}/${LOG_CHANNEL_ID}/${logMsg.id}`
   );
 
-  caseRooms.delete(i.channel.id);
+  caseRooms.delete(channelId);
 
   setTimeout(() => {
     i.channel.delete().catch(() => {});
@@ -509,6 +538,7 @@ if (i.isButton() && i.customId === 'confirm_submit') {
 
   return;
 }
+
 
 /* ===== DELETE CASE CHANNEL ===== */
 if (i.isButton() && i.customId === 'delete_case') {
@@ -527,9 +557,9 @@ if (i.isButton() && i.customId === 'delete_case') {
   }
 
   await i.editReply('🗑️ กำลังลบห้อง...');
-  await i.channel.delete().catch(console.error);
+  await i.channel.delete().catch(() => {});
 
-  return; // ✅ สำคัญ
+  return;
 }
 
 /* ===== เช็คเคสตัวเอง ===== */
