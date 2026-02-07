@@ -424,17 +424,18 @@ if (i.isButton() && i.customId === 'submit_case') {
       .setStyle(ButtonStyle.Secondary)
   );
 
+  // ⚠️ ตรงนี้ reply ไปแล้ว
   return safeReply(i, {
-  content: '📤 กรุณายืนยันการส่งคดี',
-  components: [row],
-  ephemeral: true
-});
-
+    content: '📤 กรุณายืนยันการส่งคดี',
+    components: [row],
+    ephemeral: true
+  });
 }
 
 /* ===== CONFIRM SUBMIT ===== */
 if (i.isButton() && i.customId === 'confirm_submit') {
-  await i.deferReply({ ephemeral: true });
+  // ❌ ห้าม defer แล้ว
+  // เพราะ interaction นี้เคย reply มาแล้ว
 
   const room = caseRooms.get(i.channel.id);
   if (!room) {
@@ -480,11 +481,12 @@ if (i.isButton() && i.customId === 'confirm_submit') {
     `📌 บันทึกคดีแล้ว\n🔗 https://discord.com/channels/${i.guild.id}/${LOG_CHANNEL_ID}/${logMsg.id}`
   );
 
-  caseRooms.delete(i.channel.id); // ✅ สำคัญมาก
+  caseRooms.delete(i.channel.id);
 
   setTimeout(() => {
     i.channel.delete().catch(() => {});
   }, 3000);
+
   return;
 }
 
@@ -1431,6 +1433,5 @@ if (!process.env.DISCORD_TOKEN) {
   console.error('❌ DISCORD_TOKEN is missing!');
   process.exit(1);
 }
-
 
 client.login(process.env.DISCORD_TOKEN);
