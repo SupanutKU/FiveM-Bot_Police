@@ -255,18 +255,18 @@ client.on(Events.MessageCreate, msg => {
 /* ======================
    INTERACTION HANDLER
 ====================== */
-client.on(Events.InteractionCreate, async (interaction) => { 
+const i = interaction;
+client.on(Events.InteractionCreate, async (i) => { 
   try {
-    /* ===== SLASH ===== */
-    if (interaction.isChatInputCommand()) {
-      const cmd = client.commands.get(interaction.commandName);
-      if (cmd) return await cmd.execute(interaction);
+
+    /* ===== SLASH COMMAND ===== */
+    if (i.isChatInputCommand()) {
+      const cmd = client.commands.get(i.commandName);
+      if (cmd) return await cmd.execute(i);
       return;
     }
 
-    const i = interaction;
-
-    /* ===== MAP CUSTOM ID ===== */
+    /* ===== CREATE CASE ===== */
     const caseMap = {
       case_normal: 'normal',
       case_take2: 'take2',
@@ -274,156 +274,61 @@ client.on(Events.InteractionCreate, async (interaction) => {
       case_store: 'store'
     };
 
-    /* ===== CREATE CASE ===== */
     if (caseMap[i.customId]) {
       await i.deferReply({ ephemeral: true });
       return createCaseChannel(i, caseMap[i.customId]);
     }
 
     /* ===== SUBMIT CASE ===== */
-if (i.isButton() && i.customId === 'submit_case') {
-  const room = caseRooms.get(i.channel.id);
-  if (!room) {
-    return i.reply({ content: '❌ ห้องนี้ไม่ใช่ห้องคดี', ephemeral: true });
-  }
+    if (i.isButton() && i.customId === 'submit_case') {
+      const room = caseRooms.get(i.channel.id);
+      if (!room) {
+        return i.reply({ content: '❌ ห้องนี้ไม่ใช่ห้องคดี', ephemeral: true });
+      }
 
-  const isOwner = i.user.id === room.ownerId;
-  const isHelper = room.tagged.has(i.user.id);
+      const isOwner = i.user.id === room.ownerId;
+      const isHelper = room.tagged.has(i.user.id);
 
-  if (!isOwner && !isHelper) {
-    return i.reply({
-      content: '❌ เฉพาะเจ้าของคดีหรือผู้ช่วยเท่านั้น',
-      ephemeral: true
-    });
-  }
+      if (!isOwner && !isHelper) {
+        return i.reply({
+          content: '❌ เฉพาะเจ้าของคดีหรือผู้ช่วยเท่านั้น',
+          ephemeral: true
+        });
+      }
 
-  if (!room.hasImage) {
-    return i.reply({
-      content: '❌ ต้องส่งรูปก่อนถึงจะส่งคดีได้',
-      ephemeral: true
-    });
-  }
+      if (!room.hasImage) {
+        return i.reply({
+          content: '❌ ต้องส่งรูปก่อนถึงจะส่งคดีได้',
+          ephemeral: true
+        });
+      }
 
-  return i.reply({
-    content: '✅ พร้อมส่งคดีแล้ว',
-    ephemeral: true
-  });
-}
+      return i.reply({
+        content: '✅ พร้อมส่งคดีแล้ว',
+        ephemeral: true
+      });
+    }
 
-    /* ===== SUBMIT CASE (PREVIEW) ===== */
-if (i.isButton() && i.customId === 'submit_case') {
-  const room = caseRooms.get(i.channel.id);
-  if (!room) {
-    return i.reply({
-      content: '❌ ห้องนี้ไม่ใช่ห้องคดี',
-      ephemeral: true
-    });
-  }
+    /* ===== DELETE CASE ===== */
+    if (i.isButton() && i.customId === 'delete_case') {
+      await i.deferReply({ ephemeral: true });
 
-  const isOwner = i.user.id === room.ownerId;
-  const isHelper = room.tagged.has(i.user.id);
+      const room = caseRooms.get(i.channel.id);
+      if (!room) {
+        return i.editReply('❌ ห้องนี้ไม่ใช่ห้องคดี');
+      }
 
-  if (!isOwner && !isHelper) {
-    return i.reply({
-      content: '❌ เฉพาะเจ้าของคดีหรือผู้ช่วยเท่านั้น',
-      ephemeral: true
-    });
-  }
+      const isOwner = i.user.id === room.ownerId;
+      const isPolice = i.member.roles.cache.has(POLICE_ROLE_ID);
 
-  if (!room.hasImage) {
-    return i.reply({
-      content: '❌ ต้องส่งรูปก่อนถึงจะส่งคดีได้',
-      ephemeral: true
-    });
-  }
+      if (!isOwner && !isPolice) {
+        return i.editReply('❌ คุณไม่มีสิทธิ์ลบห้องนี้');
+      }
 
-  return i.reply({
-    content: '✅ กำลังเตรียมส่งคดี กรุณายืนยัน',
-    ephemeral: true
-  });
-}
-
-/* ===== CONFIRM SUBMIT ===== */
-if (i.isButton() && i.customId === 'confirm_submit') {
-  await i.deferReply({ ephemeral: true });
-
-  const room = caseRooms.get(i.channel.id);
-  if (!room) {
-    return i.editReply('❌ ไม่พบข้อมูลคดี');
-  }
-
-  // 🔐 CHECK PERMISSION
-  const isOwner = i.user.id === room.ownerId;
-  const isHelper = room.tagged.has(i.user.id);
-
-  if (!isOwner && !isHelper) {
-    return i.editReply('❌ คุณไม่มีสิทธิ์ยืนยันส่งคดีนี้');
-  }
-
-  const cases = loadCases();
-
-  const newCase = {
-    id: Date.now(),
-    officer: room.ownerId,
-    type: room.caseType,
-    helpers: [...room.tagged.keys()],
-    createdAt: getThaiISOString(),
-    imageUrl: room.imageUrl
-  };
-
-  const helpersText =
-    newCase.helpers.length > 0
-      ? newCase.helpers.map(id => `<@${id}>`).join(', ')
-      : 'ไม่มี';
-
-  const embed = new EmbedBuilder()
-    .setColor(0x2ecc71)
-    .setTitle('✅ บันทึกการส่งคดี')
-    .setDescription(
-      `📁 คดี-${newCase.type}-${newCase.id}\n\n` +
-      `👮 คนลงคดี\n<@${newCase.officer}>\n\n` +
-      `🛠 ผู้ช่วย\n${helpersText}\n\n` +
-      `🕒 เวลา\n${new Date().toLocaleString('th-TH')}`
-    )
-    .setImage(newCase.imageUrl)
-    .setFooter({ text: 'ระบบ Bot Police' });
-
-  const logChannel = i.guild.channels.cache.get(LOG_CHANNEL_ID);
-  const msg = await logChannel.send({ embeds: [embed] });
-
-  newCase.logMessageId = msg.id;
-  cases.push(newCase);
-  saveCases(cases);
-
-  await i.editReply('✅ ส่งคดีเรียบร้อย กำลังปิดห้อง...');
-  await i.channel.send('📁 คดีถูกบันทึกแล้ว');
-
-  setTimeout(() => {
-    i.channel.delete().catch(() => {});
-  }, 2000);
-}
-
-/* ===== DELETE CASE CHANNEL ===== */
-if (i.isButton() && i.customId === 'delete_case') {
-  await i.deferReply({ ephemeral: true });
-
-  const room = caseRooms.get(i.channel.id);
-  if (!room) {
-    return i.editReply('❌ ห้องนี้ไม่ใช่ห้องคดี');
-  }
-
-  // 🔐 อนุญาตเฉพาะเจ้าของคดี หรือ POLICE
-  const isOwner = i.user.id === room.ownerId;
-  const isPolice = i.member.roles.cache.has(POLICE_ROLE_ID);
-
-  if (!isOwner && !isPolice) {
-    return i.editReply('❌ คุณไม่มีสิทธิ์ลบห้องนี้');
-  }
-
-  await i.editReply('🗑️ กำลังลบห้อง...');
-  await i.channel.delete().catch(console.error);
-}
-
+      await i.editReply('🗑️ กำลังลบห้อง...');
+      await i.channel.delete();
+      return;
+    }
 
     /* ===== เช็คเคสตัวเอง ===== */
 if (i.customId === 'check_my_case') {
