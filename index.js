@@ -66,17 +66,17 @@ const dutyListener = require('./duty/dutyListener');
 dutyListener(client);
 
 async function safeReply(interaction, options) {
-  try {
-    if (interaction.deferred || interaction.replied) {
-      return await interaction.editReply(options);
-    } else {
-      return await interaction.reply(options);
-    }
-  } catch (err) {
-    console.error('safeReply error:', err);
+  if (interaction.deferred) {
+    return interaction.editReply(options);
   }
-}
 
+  if (interaction.replied) {
+    const { ephemeral, ...rest } = options; // ❗ ห้าม ephemeral ใน followUp
+    return interaction.followUp(rest);
+  }
+
+  return interaction.reply(options);
+}
 
 async function safeEdit(interaction, options) {
   if (interaction.replied || interaction.deferred) {
@@ -322,6 +322,23 @@ setInterval(async () => {
 
 client.on(Events.InteractionCreate, async (interaction) => { 
   try {
+    // ===== Slash Command Handler =====
+if (interaction.isChatInputCommand()) {
+  await interaction.deferReply({ ephemeral: true }); // ❌ ตัวการ 40060
+
+  const command = client.commands.get(interaction.commandName);
+  if (!command) return;
+
+  try {
+    await command.execute(interaction);
+  } catch (error) {
+    console.error(error);
+    await interaction.editReply({
+      content: '❌ เกิดข้อผิดพลาดขณะรันคำสั่ง'
+    });
+  }
+}
+
     const i = interaction;
 
     /* ===== MAP CUSTOM ID ===== */
@@ -338,7 +355,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
       return createCaseChannel(i, caseMap[i.customId]);
     }
 
-/* ===== SUBMIT CASE ===== */
+    /* ===== SUBMIT CASE ===== */
 if (i.isButton() && i.customId === 'submit_case') {
   const room = caseRooms.get(i.channel.id);
   if (!room) {
@@ -367,8 +384,7 @@ if (i.isButton() && i.customId === 'submit_case') {
 
   const row = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
-      // 🔑 ฝัง channelId
-      .setCustomId(`confirm_submit:${i.channel.id}`)
+      .setCustomId('confirm_submit')
       .setLabel('✅ ยืนยันส่งคดี')
       .setStyle(ButtonStyle.Success),
     new ButtonBuilder()
@@ -378,32 +394,21 @@ if (i.isButton() && i.customId === 'submit_case') {
   );
 
   return safeReply(i, {
-    content: '📤 กรุณายืนยันการส่งคดี',
-    components: [row],
-    ephemeral: true
-  });
+  content: '📤 กรุณายืนยันการส่งคดี',
+  components: [row],
+  ephemeral: true
+});
+
 }
 
-/* ================= CANCEL SUBMIT ================= */
-if (i.isButton() && i.customId.startsWith('cancel_submit:')) {
-  return i.update({
-    content: '❌ ยกเลิกการส่งคดีแล้ว\nคุณยังสามารถแก้ไขข้อมูลคดีได้',
-    components: []
-  });
-}
 
-/* ================= CONFIRM SUBMIT ================= */
-if (i.isButton() && i.customId.startsWith('confirm_submit:')) {
-  await i.deferUpdate(); // ✅ ใช้ update ไม่ใช่ reply
+/* ===== CONFIRM SUBMIT ===== */
+if (i.isButton() && i.customId === 'confirm_submit') {
+  await i.deferReply({ ephemeral: true });
 
-  const channelId = i.customId.split(':')[1];
-  const room = caseRooms.get(channelId);
-
+  const room = caseRooms.get(i.channel.id);
   if (!room) {
-    return i.followUp({
-      content: '❌ ไม่พบข้อมูลคดี',
-      ephemeral: true
-    });
+    return i.editReply('❌ ไม่พบข้อมูลคดี');
   }
 
   const cases = loadCases();
@@ -440,22 +445,17 @@ if (i.isButton() && i.customId.startsWith('confirm_submit:')) {
   cases.push(newCase);
   saveCases(cases);
 
-  await i.followUp({
-    content: '✅ ส่งคดีเรียบร้อย',
-    ephemeral: true
-  });
-
+  await i.editReply('✅ ส่งคดีเรียบร้อย');
   await i.channel.send(
     `📌 บันทึกคดีแล้ว\n🔗 https://discord.com/channels/${i.guild.id}/${LOG_CHANNEL_ID}/${logMsg.id}`
   );
 
-  caseRooms.delete(channelId);
+  caseRooms.delete(i.channel.id); // ✅ สำคัญมาก
 
   setTimeout(() => {
     i.channel.delete().catch(() => {});
   }, 3000);
 }
-
 
 /* ===== DELETE CASE CHANNEL ===== */
 if (i.isButton() && i.customId === 'delete_case') {
