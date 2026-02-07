@@ -11,6 +11,8 @@ module.exports = {
     .setDescription('เปิดเมนูระบบคดี'),
 
   async execute(interaction) {
+    // ⭐ สำคัญมาก ป้องกัน InteractionNotReplied
+    await interaction.deferReply({ ephemeral: true });
 
     /* ================= ROW 1 : ลงคดี ================= */
     const row1 = new ActionRowBuilder().addComponents(
@@ -66,17 +68,10 @@ module.exports = {
         .setStyle(ButtonStyle.Secondary)
     );
 
+    // ✅ ตอบ interaction แค่ครั้งเดียว
     await interaction.editReply({
-  content: 'เลือกปุ่มด้านล่างเพื่อดำเนินการ:',
-  components: [row1, row2, row3]
-});
-
-
-    // 🔐 ป้องกัน Interaction 40060
-    if (interaction.deferred || interaction.replied) {
-      await interaction.editReply(payload);
-    } else {
-      await interaction.reply(payload);
-    }
+      content: 'เลือกปุ่มด้านล่างเพื่อดำเนินการ:',
+      components: [row1, row2, row3]
+    });
   }
 };
