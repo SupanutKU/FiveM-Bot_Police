@@ -381,7 +381,7 @@ if (interaction.isChatInputCommand()) {
     };
 
     /* ===== CREATE CASE ===== */
-    if (caseMap[i.customId]) {
+    if (i.isButton() && caseMap[i.customId]) {
       await i.deferReply({ ephemeral: true });
       return createCaseChannel(i, caseMap[i.customId]);
     }
@@ -499,7 +499,6 @@ if (i.isButton() && i.customId === 'delete_case') {
     return i.editReply('❌ ห้องนี้ไม่ใช่ห้องคดี');
   }
 
-  // 🔐 อนุญาตเฉพาะเจ้าของคดี หรือ POLICE
   const isOwner = i.user.id === room.ownerId;
   const isPolice = i.member.roles.cache.has(POLICE_ROLE_ID);
 
@@ -509,8 +508,9 @@ if (i.isButton() && i.customId === 'delete_case') {
 
   await i.editReply('🗑️ กำลังลบห้อง...');
   await i.channel.delete().catch(console.error);
-}
 
+  return; // ✅ สำคัญ
+}
 
 /* ===== เช็คเคสตัวเอง ===== */
 if (i.customId === 'check_my_case') {

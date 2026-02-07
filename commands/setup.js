@@ -55,16 +55,17 @@ module.exports = {
       .setCustomId('check_user_personal')
       .setLabel('👤 เช็คเคสรายบุคคล')
       .setStyle(ButtonStyle.Secondary),
+  );
+  const row4 = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId('admin_clear_all_cases')
       .setLabel('🧹 ลบเคสทั้งหมด (Admin)')
       .setStyle(ButtonStyle.Danger)
   );
-
   // ✅ reply ครั้งเดียว จบ
   return interaction.reply({
     content: 'เลือกปุ่มด้านล่างเพื่อดำเนินการ:',
-    components: [row1, row2, row3]
+    components: [row1, row2, row3, row4]
   });
 }
 
