@@ -155,57 +155,76 @@ async function lockPoliceCategory(guild) {
 /* ================= CREATE CASE CHANNEL ================= */
 async function createCaseChannel(interaction, caseType) {
   const guild = interaction.guild;
-  await lockPoliceCategory(guild);
   const user = interaction.user;
 
-  const channel = await interaction.guild.channels.create({
-  name: `📁-คดี-${interaction.user.username}`,
-  type: ChannelType.GuildText,
-  parent: '1461297109088075947', // หมวด POLICE
-  permissionOverwrites: [
-    // ❌ ทุกคนห้ามเห็น
-    {
-      id: interaction.guild.roles.everyone.id,
-      deny: [
-        PermissionFlagsBits.ViewChannel
-      ]
-    },
+  await lockPoliceCategory(guild);
 
-    // ✅ ยศ POLICE เห็น + ใช้งาน
-    {
-      id: '1461296754916851889', // POLICE ROLE
-      allow: [
-        PermissionFlagsBits.ViewChannel,
-        PermissionFlagsBits.SendMessages,
-        PermissionFlagsBits.ReadMessageHistory
-      ]
-    },
+  const channel = await guild.channels.create({
+    name: `📁-คดี-${user.username}`,
+    type: ChannelType.GuildText,
+    parent: POLICE_CATEGORY_ID,
+    permissionOverwrites: [
+      // ❌ everyone
+      {
+        id: guild.roles.everyone.id,
+        deny: [PermissionFlagsBits.ViewChannel]
+      },
 
-    // ✅ เจ้าของคดี
-    {
-      id: interaction.user.id,
-      allow: [
-        PermissionFlagsBits.ViewChannel,
-        PermissionFlagsBits.SendMessages,
-        PermissionFlagsBits.ReadMessageHistory,
-        PermissionFlagsBits.ManageChannels
-      ]
-    },
+      // ✅ POLICE role
+      {
+        id: POLICE_ROLE_ID,
+        allow: [
+          PermissionFlagsBits.ViewChannel,
+          PermissionFlagsBits.SendMessages,
+          PermissionFlagsBits.ReadMessageHistory
+        ]
+      },
 
-    // 🤖 bot police (สำคัญมาก ไม่งั้นลบไม่ได้)
-    {
-      id: interaction.client.user.id,
-      allow: [
-        PermissionFlagsBits.ViewChannel,
-        PermissionFlagsBits.SendMessages,
-        PermissionFlagsBits.ReadMessageHistory,
-        PermissionFlagsBits.ManageChannels
-      ]
-    }
-  ]
-});
+      // ✅ เจ้าของคดี
+      {
+        id: user.id,
+        allow: [
+          PermissionFlagsBits.ViewChannel,
+          PermissionFlagsBits.SendMessages,
+          PermissionFlagsBits.ReadMessageHistory,
+          PermissionFlagsBits.ManageChannels
+        ]
+      },
+
+      // 🤖 bot
+      {
+        id: interaction.client.user.id,
+        allow: [
+          PermissionFlagsBits.ViewChannel,
+          PermissionFlagsBits.SendMessages,
+          PermissionFlagsBits.ReadMessageHistory,
+          PermissionFlagsBits.ManageChannels
+        ]
+      }
+    ]
+  });
+
+  // ✅ REGISTER ROOM
+  caseRooms.set(channel.id, {
+    ownerId: user.id,
+    caseType,
+    hasImage: false
+  });
+
+  const row = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId('submit_case')
+      .setLabel('📤 ส่งคดี')
+      .setStyle(ButtonStyle.Success),
+
+    new ButtonBuilder()
+      .setCustomId('delete_case')
+      .setLabel('🗑️ ลบห้อง')
+      .setStyle(ButtonStyle.Danger)
+  );
 
   await interaction.editReply(`✅ สร้างห้อง ${channel} เรียบร้อย`);
+
   await channel.send({
     content:
       `👤 เจ้าของห้อง: <@${user.id}>\n` +
@@ -214,7 +233,6 @@ async function createCaseChannel(interaction, caseType) {
     components: [row]
   });
 }
-
 /* ================= MESSAGE TRACK ================= */
 client.on(Events.MessageCreate, msg => {
   if (msg.author.bot || !msg.guild) return;
@@ -233,8 +251,10 @@ client.on(Events.MessageCreate, msg => {
     if (u.id !== msg.author.id) room.tagged.set(u.id, true);
   }
 });
-
-client.on(Events.InteractionCreate, async (interaction) => {
+/* ======================
+   INTERACTION HANDLER
+====================== */
+client.on(Events.InteractionCreate, async (interaction) => { 
   try {
     /* ===== SLASH ===== */
     if (interaction.isChatInputCommand()) {
@@ -632,7 +652,6 @@ if (
   }
   saveCases(cases);
 
-  /* ===== UPDATE CASE LOG EMBED ===== */
  /* ===== UPDATE CASE LOG EMBED ===== */
 const logChannel = await interaction.guild.channels.fetch(LOG_CHANNEL_ID);
 const logMessage = await logChannel.messages.fetch(targetCase.logMessageId);
