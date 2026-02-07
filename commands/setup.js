@@ -11,8 +11,6 @@ module.exports = {
     .setDescription('เปิดเมนูระบบคดี'),
 
   async execute(interaction) {
-    // ⭐ สำคัญที่สุด แก้ Unknown interaction
-    await interaction.deferReply({ ephemeral: false });
 
     /* ================= ROW 1 : ลงคดี ================= */
     const row1 = new ActionRowBuilder().addComponents(
@@ -68,7 +66,7 @@ module.exports = {
         .setStyle(ButtonStyle.Secondary)
     );
 
-    // ✅ ตอบหลัง defer
+    // ✅ ตอบ interaction (index.js defer มาแล้ว)
     await interaction.editReply({
       content: 'เลือกปุ่มด้านล่างเพื่อดำเนินการ:',
       components: [row1, row2, row3]
