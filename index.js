@@ -432,7 +432,6 @@ if (i.isButton() && i.customId === 'submit_case') {
 
 }
 
-
 /* ===== CONFIRM SUBMIT ===== */
 if (i.isButton() && i.customId === 'confirm_submit') {
   await i.deferReply({ ephemeral: true });
@@ -486,6 +485,7 @@ if (i.isButton() && i.customId === 'confirm_submit') {
   setTimeout(() => {
     i.channel.delete().catch(() => {});
   }, 3000);
+  return;
 }
 
 /* ===== DELETE CASE CHANNEL ===== */
