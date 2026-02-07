@@ -25,15 +25,26 @@ function loadCases() {
 }
 
 module.exports = async (interaction) => {
-  if (!interaction.isButton()) return;
+ if (!interaction.isButton()) return;
 
-  /* 🔒 LOCK interaction ทันที ป้องกัน Interaction Failed */
+const id = interaction.customId;
+
+/* 🔒 LOCK interaction เฉพาะปุ่มที่ไม่ใช่ปุ่มคดี */
+/* ❌ ห้าม auto defer ปุ่ม submit / confirm / cancel */
+const CASE_BUTTONS = [
+  'submit_case',
+  'confirm_submit',
+  'cancel_submit'
+];
+
+if (!CASE_BUTTONS.some(b => id.startsWith(b))) {
   if (!interaction.deferred && !interaction.replied) {
     await interaction.deferReply({ ephemeral: true }).catch(() => {});
   }
+}
 
-  const id = interaction.customId;
-  const cases = loadCases();
+const cases = loadCases();
+
 
   /* =========================
      เช็คเคสตัวเอง
