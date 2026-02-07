@@ -256,7 +256,7 @@ client.on(Events.MessageCreate, msg => {
    INTERACTION HANDLER
 ====================== */
 const i = interaction;
-client.on(Events.InteractionCreate, async (i) => { 
+client.on(Events.InteractionCreate, async (interaction) => { 
   try {
 
     /* ===== SLASH COMMAND ===== */
@@ -308,7 +308,7 @@ client.on(Events.InteractionCreate, async (i) => {
         ephemeral: true
       });
     }
-/*PREVIEW CASE */
+
     /* ===== DELETE CASE ===== */
     if (i.isButton() && i.customId === 'delete_case') {
       await i.deferReply({ ephemeral: true });
