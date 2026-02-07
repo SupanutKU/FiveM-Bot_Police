@@ -421,7 +421,9 @@ if (i.isButton() && i.customId === 'confirm_submit') {
     officer: room.ownerId,
     type: room.caseType,
     helpers: [...room.tagged],
-    createdAt: getUTCISOString(),
+    createdAt: new Date().toLocaleString('sv-SE', {
+  timeZone: 'Asia/Bangkok'
+}),
     imageUrl: room.imageUrl
   };
 
