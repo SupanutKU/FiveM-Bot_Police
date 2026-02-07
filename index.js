@@ -541,6 +541,86 @@ if (i.customId === 'mycase_this_week') {
 
   return safeEdit(i, { embeds: [embed] });
 }
+/* เช็คเคสทั้งหมด*/
+/* ===== เช็คทั้งหมด ===== */
+if (i.customId === 'mycase_all') {
+  await i.deferReply({ ephemeral: true });
+
+  const cases = loadCases();
+
+  const myCases = cases.filter(c => {
+    const isOfficer = c.officer === i.user.id;
+    const isHelper = c.helpers?.includes(i.user.id);
+    if (!isOfficer && !isHelper) return false;
+    if (!c.createdAt) return false;
+    return true; // ไม่กรองวัน
+  });
+
+  const count = {
+    normal: { officer: 0, helper: 0 },
+    take2: { officer: 0, helper: 0 },
+    orange_red: { officer: 0, helper: 0 },
+    store: { officer: 0, helper: 0 }
+  };
+
+  for (const c of myCases) {
+    if (!count[c.type]) continue;
+    if (c.officer === i.user.id) count[c.type].officer++;
+    if (c.helpers?.includes(i.user.id)) count[c.type].helper++;
+  }
+
+  const embed = new EmbedBuilder()
+    .setColor(0x3498db)
+    .setAuthor({
+      name: `📊 สรุปเคสทั้งหมดของ ${i.user.username}`,
+      iconURL: i.user.displayAvatarURL()
+    })
+    .setThumbnail(i.user.displayAvatarURL())
+    .setDescription(`📂 **ช่วงเวลา:** ทั้งหมด`)
+    .addFields(
+      {
+        name: '📁 คดีปกติ',
+        value:
+          `ลงเอง: ${count.normal.officer}\n` +
+          `ถูกแท็ก: ${count.normal.helper}\n` +
+          `**รวม: ${count.normal.officer + count.normal.helper}**`,
+        inline: true
+      },
+      {
+        name: '✌️ Take2',
+        value:
+          `ลงเอง: ${count.take2.officer}\n` +
+          `ถูกแท็ก: ${count.take2.helper}\n` +
+          `**รวม: ${count.take2.officer + count.take2.helper}**`,
+        inline: true
+      },
+      {
+        name: '🔴 ส้ม-แดง',
+        value:
+          `ลงเอง: ${count.orange_red.officer}\n` +
+          `ถูกแท็ก: ${count.orange_red.helper}\n` +
+          `**รวม: ${count.orange_red.officer + count.orange_red.helper}**`,
+        inline: true
+      },
+      {
+        name: '🏪 งัดร้าน',
+        value:
+          `ลงเอง: ${count.store.officer}\n` +
+          `ถูกแท็ก: ${count.store.helper}\n` +
+          `**รวม: ${count.store.officer + count.store.helper}**`,
+        inline: true
+      },
+      {
+        name: '📊 รวมทั้งหมด',
+        value: `**${myCases.length} เคส**`,
+        inline: false
+      }
+    )
+    .setFooter({ text: 'Bot Police • สรุปเคสทั้งหมดอัตโนมัติ' })
+    .setTimestamp();
+
+  return safeEdit(i, { embeds: [embed] });
+}
 
     /* ===== ADD HELPER BUTTON ===== */
 if (interaction.isButton() && interaction.customId === 'add_helper') {
