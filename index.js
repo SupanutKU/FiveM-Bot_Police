@@ -144,56 +144,6 @@ function formatThaiDateTime(dateInput) {
     second: '2-digit'
   });
 }
-function buildCaseLogEmbed({
-  caseType,
-  officerId,
-  helpers = [],
-  imageUrl,
-  createdAt,
-  channelName
-}) {
-  const helperText =
-    helpers.length > 0
-      ? helpers.map(id => `<@${id}>`).join('\n')
-      : 'ไม่มีผู้ช่วยเหลือ';
-
-  const embed = new EmbedBuilder()
-    .setColor(0x2ecc71)
-    .setAuthor({
-      name: '✅ บันทึกการส่งคดี',
-      iconURL: 'https://cdn-icons-png.flaticon.com/512/190/190411.png'
-    })
-    .addFields(
-      {
-        name: '📁 เลข/ห้องคดี',
-        value: channelName || '-',
-        inline: false
-      },
-      {
-        name: '👮 คนลงคดี',
-        value: `<@${officerId}>`,
-        inline: true
-      },
-      {
-        name: '🛠 ผู้ช่วยเหลือ',
-        value: `(${helpers.length} คน)\n${helperText}`,
-        inline: true
-      },
-      {
-        name: '🕒 วันเวลา',
-        value: formatThaiDateTime(createdAt),
-        inline: false
-      }
-    )
-    .setTimestamp(new Date(createdAt))
-    .setFooter({ text: 'Bot Police' });
-
-  if (imageUrl) {
-    embed.setImage(imageUrl);
-  }
-
-  return embed;
-}
 
 function saveCases(cases) {
   fs.writeFileSync(DATA_PATH, JSON.stringify({ cases }, null, 2));
@@ -432,15 +382,16 @@ if (i.isButton() && i.customId === 'confirm_submit') {
       ? newCase.helpers.map(id => `<@${id}>`).join(', ')
       : 'ไม่มี';
 
-const embed = buildCaseLogEmbed({
-  caseType: newCase.type,
-  officerId: newCase.officer,
-  helpers: newCase.helpers,
-  imageUrl: newCase.imageUrl,
-  createdAt: newCase.createdAt,
-  channelName: i.channel.name
-});
-
+  const embed = new EmbedBuilder()
+    .setColor(0x2ecc71)
+    .setTitle('📁 บันทึกคดี')
+    .setDescription(
+      `👮 คนลงคดี\n<@${newCase.officer}>\n\n` +
+      `🛠 ผู้ช่วย\n${helpersText}\n\n` +
+      `🕒 เวลา\n${formatThaiDateTime(newCase.createdAt)}`
+    )
+    .setImage(newCase.imageUrl)
+    .setFooter({ text: 'Bot Police' });
 
   const logChannel = await i.guild.channels.fetch(LOG_CHANNEL_ID);
   const logMsg = await logChannel.send({ embeds: [embed] });
@@ -1048,6 +999,7 @@ if (interaction.isButton() && interaction.customId === 'export_excel') {
         ลิงก์คดี: `https://discord.com/channels/${interaction.guild.id}/${LOG_CHANNEL_ID}/${c.logMessageId}`
       });
 
+      /* ---------- Count by officer ---------- */
      /* ---------- Count by officer ---------- */
 if (!countByOfficer[officerName]) {
   countByOfficer[officerName] = {
