@@ -324,7 +324,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
   try {
     // ===== Slash Command Handler =====
 if (interaction.isChatInputCommand()) {
-  await interaction.deferReply({ ephemeral: true }); // ❌ ตัวการ 40060
 
   const command = client.commands.get(interaction.commandName);
   if (!command) return;
