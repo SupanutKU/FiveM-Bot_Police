@@ -205,11 +205,13 @@ async function createCaseChannel(interaction, caseType) {
   });
 
   // ✅ REGISTER ROOM
-  caseRooms.set(channel.id, {
+ caseRooms.set(channel.id, {
   ownerId: user.id,
   caseType,
   hasImage: false,
-  tagged: new Set() // ✅ สำคัญมาก
+  tagged: new Set(),
+  imageUrl: null,
+  lastActive: Date.now() // ✅ เพิ่ม
 });
 
   const row = new ActionRowBuilder().addComponents(
@@ -240,6 +242,8 @@ client.on(Events.MessageCreate, msg => {
   const room = caseRooms.get(msg.channel.id);
   if (!room) return;
 
+  room.lastActive = Date.now(); // ✅ เพิ่ม
+
   if (msg.attachments.size) {
     const att = msg.attachments.first();
     if (att?.contentType?.startsWith('image/')) {
@@ -252,6 +256,22 @@ client.on(Events.MessageCreate, msg => {
     if (u.id !== msg.author.id) room.tagged.add(u.id);
   }
 });
+setInterval(async () => {
+  const now = Date.now();
+
+  for (const [channelId, room] of caseRooms.entries()) {
+    // ❗ 30 นาทีไม่มีการใช้งาน
+    if (now - room.lastActive > 30 * 60 * 1000) {
+      const channel = client.channels.cache.get(channelId);
+      if (channel) {
+        await channel.send('⏰ ห้องนี้ไม่มีการใช้งานเกิน 30 นาที ระบบจะลบอัตโนมัติ');
+        setTimeout(() => channel.delete().catch(() => {}), 5000);
+      }
+      caseRooms.delete(channelId);
+    }
+  }
+}, 30 * 60 * 1000);
+
 /* ======================
    INTERACTION HANDLER
 ====================== */
