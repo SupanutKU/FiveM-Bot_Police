@@ -1343,8 +1343,27 @@ function exportDutyExcel() {
 }
 
   } catch (err) {
-    console.error('INTERACTION ERROR:', err);
+  console.error('INTERACTION ERROR:', err);
+
+  try {
+    // ถ้า defer ไปแล้ว → ใช้ editReply เท่านั้น
+    if (interaction?.deferred && !interaction.replied) {
+      await interaction.editReply({
+        content: '❌ เกิดข้อผิดพลาด'
+      });
+    }
+
+    // ถ้ายังไม่ตอบอะไรเลย → reply ได้
+    else if (!interaction?.replied) {
+      await interaction.reply({
+        content: '❌ เกิดข้อผิดพลาด',
+        ephemeral: true
+      });
+    }
+  } catch {
+    // กันพังซ้ำ เงียบไว้
   }
+}
 });
 exportDutyExcel()
   .then(file => console.log('📊 Export สำเร็จ:', file))
