@@ -341,10 +341,19 @@ setInterval(async () => {
 
 client.on(Events.InteractionCreate, async (interaction) => {
   try {
-    const i = interaction;
+    
+    /* ========== SLASH COMMAND (/setup) ========== */
+    if (interaction.isChatInputCommand()) {
+      const command = client.commands.get(interaction.commandName);
+      if (!command) return;
+      
+      await command.execute(interaction);
+      return; // ⭐ สำคัญ
+    }
+    /* ========== BUTTONS (ส่งเคส) ========== */
+    if (!interaction.isButton()) return;
 
-    // ใช้เฉพาะปุ่ม
-    if (!i.isButton()) return;
+    const i = interaction;
 
     // 🛑 กัน interaction ที่ถูกตอบไปแล้ว (FIX 40060)
     if (i.replied || i.deferred) return;
@@ -1343,27 +1352,19 @@ function exportDutyExcel() {
 }
 
   } catch (err) {
-  console.error('INTERACTION ERROR:', err);
+    console.error('INTERACTION ERROR:', err);
 
-  try {
-    // ถ้า defer ไปแล้ว → ใช้ editReply เท่านั้น
-    if (interaction?.deferred && !interaction.replied) {
-      await interaction.editReply({
-        content: '❌ เกิดข้อผิดพลาด'
-      });
-    }
-
-    // ถ้ายังไม่ตอบอะไรเลย → reply ได้
-    else if (!interaction?.replied) {
-      await interaction.reply({
-        content: '❌ เกิดข้อผิดพลาด',
-        ephemeral: true
-      });
-    }
-  } catch {
-    // กันพังซ้ำ เงียบไว้
+    try {
+      if (interaction?.deferred && !interaction.replied) {
+        await interaction.editReply({ content: '❌ เกิดข้อผิดพลาด' });
+      } else if (!interaction?.replied) {
+        await interaction.reply({
+          content: '❌ เกิดข้อผิดพลาด',
+          ephemeral: true
+        });
+      }
+    } catch {}
   }
-}
 });
 exportDutyExcel()
   .then(file => console.log('📊 Export สำเร็จ:', file))
