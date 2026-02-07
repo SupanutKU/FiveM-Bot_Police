@@ -36,8 +36,7 @@ const {
   ModalBuilder,
   TextInputBuilder,
   TextInputStyle,
-  UserSelectMenuBuilder,
-  Partials
+  UserSelectMenuBuilder
 } = require('discord.js');
 
 const exportDutyExcel = require('./duty/exportDutyExcel');
@@ -53,6 +52,14 @@ async function getMemberName(guild, userId) {
     return `ไม่พบผู้ใช้ (${userId})`;
   }
 }
+function getThaiISOString() {
+  const now = new Date();
+  const thaiTime = new Date(
+    now.toLocaleString("en-US", { timeZone: "Asia/Bangkok" })
+  );
+  return thaiTime.toISOString();
+}
+
 
 /* ================= CLIENT ================= */
 const client = new Client({
@@ -61,26 +68,15 @@ const client = new Client({
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.MessageContent,
     GatewayIntentBits.GuildMembers // ✅ เพิ่ม
-  ],
-  partials: [
-    Partials.Message,
-    Partials.Channel,
-    Partials.Reaction
   ]
 });
 const dutyListener = require('./duty/dutyListener');
 dutyListener(client);
 
 async function safeReply(interaction, options) {
-  if (interaction.deferred) {
-    return interaction.editReply(options);
+  if (interaction.replied || interaction.deferred) {
+    return interaction.followUp(options);
   }
-
-  if (interaction.replied) {
-    const { ephemeral, ...rest } = options; // ❗ ห้าม ephemeral ใน followUp
-    return interaction.followUp(rest);
-  }
-
   return interaction.reply(options);
 }
 
@@ -142,17 +138,7 @@ function parseThaiDate(str) {
   return new Date(y - 543, m - 1, d);
 }
 
-function formatThaiDateTime(dateInput) {
-  return new Date(dateInput).toLocaleString('th-TH', {
-    timeZone: 'Asia/Bangkok',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit'
-  });
-}
+
 
 function saveCases(cases) {
   fs.writeFileSync(DATA_PATH, JSON.stringify({ cases }, null, 2));
@@ -171,13 +157,7 @@ async function lockPoliceCategory(guild) {
 
   console.log('🔒 POLICE category locked');
 }
-client.on('error', err => {
-  console.error('DISCORD CLIENT ERROR:', err);
-});
 
-process.on('unhandledRejection', err => {
-  console.error('UNHANDLED REJECTION:', err);
-});
 /* ================= CREATE CASE CHANNEL ================= */
 async function createCaseChannel(interaction, caseType) {
   const guild = interaction.guild;
@@ -265,66 +245,23 @@ async function createCaseChannel(interaction, caseType) {
 /* ================= MESSAGE TRACK ================= */
 client.on(Events.MessageCreate, msg => {
   if (msg.author.bot || !msg.guild) return;
-
   const room = caseRooms.get(msg.channel.id);
   if (!room) return;
 
-  // อัปเดตเวลาใช้งานล่าสุด
-  room.lastActive = Date.now();
+  room.lastActive = Date.now(); // ✅ เพิ่ม
 
-  // =====================
-  // ✅ 1. เช็ครูปจาก attachment
-  // =====================
   if (msg.attachments.size) {
     const att = msg.attachments.first();
     if (att?.contentType?.startsWith('image/')) {
       room.hasImage = true;
       room.imageUrl = att.url;
-      return;
     }
   }
 
-  // =====================
-  // ✅ 2. เช็ครูปจาก embed (สำคัญมาก)
-  // =====================
-  if (msg.embeds.length) {
-    const embed = msg.embeds[0];
-    if (embed.image?.url) {
-      room.hasImage = true;
-      room.imageUrl = embed.image.url;
-      return;
-    }
-  }
-
-  // =====================
-  // ✅ 3. เก็บคนที่ถูกแท็ก
-  // =====================
   for (const u of msg.mentions.users.values()) {
-    if (u.id !== msg.author.id) {
-      room.tagged.add(u.id);
-    }
+    if (u.id !== msg.author.id) room.tagged.add(u.id);
   }
 });
-/* ================= DELETE LOG = DELETE CASE ================= */
-client.on(Events.MessageDelete, async (message) => {
-  // สนใจเฉพาะห้อง log เท่านั้น
-  if (!message.guild) return;
-  if (message.channel.id !== LOG_CHANNEL_ID) return;
-
-  const cases = loadCases();
-  const before = cases.length;
-
-  // ลบคดีที่ผูกกับ logMessageId นี้
-  const filteredCases = cases.filter(
-    c => c.logMessageId !== message.id
-  );
-
-  if (filteredCases.length !== before) {
-    saveCases(filteredCases);
-    console.log(`🗑️ ลบคดีที่ผูกกับ log ${message.id} แล้ว`);
-  }
-});
-
 setInterval(async () => {
   const now = Date.now();
 
@@ -347,21 +284,15 @@ setInterval(async () => {
 
 client.on(Events.InteractionCreate, async (interaction) => { 
   try {
-    // ===== Slash Command Handler =====
-if (interaction.isChatInputCommand()) {
-
-  const command = client.commands.get(interaction.commandName);
-  if (!command) return;
-
-  try {
-    await command.execute(interaction);
-  } catch (error) {
-    console.error(error);
-    await interaction.editReply({
-      content: '❌ เกิดข้อผิดพลาดขณะรันคำสั่ง'
-    });
-  }
+    if (interaction.isButton() || interaction.isModalSubmit()) {
+  if (interaction.replied || interaction.deferred) return;
 }
+    /* ===== SLASH ===== */
+    if (interaction.isChatInputCommand()) {
+      const cmd = client.commands.get(interaction.commandName);
+      if (cmd) return await cmd.execute(interaction);
+      return;
+    }
 
     const i = interaction;
 
@@ -383,24 +314,21 @@ if (interaction.isChatInputCommand()) {
 if (i.isButton() && i.customId === 'submit_case') {
   const room = caseRooms.get(i.channel.id);
   if (!room) {
-    return safeReply(i, {
-      content: '❌ ห้องนี้ไม่ใช่ห้องคดี',
-      ephemeral: true
-    });
+    return i.reply({ content: '❌ ห้องนี้ไม่ใช่ห้องคดี', ephemeral: true });
   }
 
   const isOwner = i.user.id === room.ownerId;
   const isHelper = room.tagged.has(i.user.id);
 
   if (!isOwner && !isHelper) {
-    return safeReply(i, {
+    return i.reply({
       content: '❌ เฉพาะเจ้าของคดีหรือผู้ช่วยเท่านั้น',
       ephemeral: true
     });
   }
 
   if (!room.hasImage) {
-    return safeReply(i, {
+    return i.reply({
       content: '❌ ต้องส่งรูปก่อนถึงจะส่งคดีได้',
       ephemeral: true
     });
@@ -417,14 +345,12 @@ if (i.isButton() && i.customId === 'submit_case') {
       .setStyle(ButtonStyle.Secondary)
   );
 
-  return safeReply(i, {
-  content: '📤 กรุณายืนยันการส่งคดี',
-  components: [row],
-  ephemeral: true
-});
-
+  return i.reply({
+    content: '📤 กรุณายืนยันการส่งคดี',
+    components: [row],
+    ephemeral: true
+  });
 }
-
 
 /* ===== CONFIRM SUBMIT ===== */
 if (i.isButton() && i.customId === 'confirm_submit') {
@@ -442,7 +368,7 @@ if (i.isButton() && i.customId === 'confirm_submit') {
     officer: room.ownerId,
     type: room.caseType,
     helpers: [...room.tagged],
-    createdAt: Date.now(),
+    createdAt: getThaiISOString(),
     imageUrl: room.imageUrl
   };
 
@@ -457,7 +383,7 @@ if (i.isButton() && i.customId === 'confirm_submit') {
     .setDescription(
       `👮 คนลงคดี\n<@${newCase.officer}>\n\n` +
       `🛠 ผู้ช่วย\n${helpersText}\n\n` +
-      `🕒 เวลา\n${formatThaiDateTime(newCase.createdAt)}`
+      `🕒 เวลา\n${new Date().toLocaleString('th-TH')}`
     )
     .setImage(newCase.imageUrl)
     .setFooter({ text: 'Bot Police' });
@@ -1360,13 +1286,19 @@ function exportDutyExcel() {
     });
   });
 }
+
   } catch (err) {
     console.error('INTERACTION ERROR:', err);
-    if (interaction?.deferred) {
+    if (interaction.isRepliable()) {
   try {
-    await interaction.editReply({ content: '❌ เกิดข้อผิดพลาด' });
+    if (interaction.deferred || interaction.replied) {
+      await interaction.followUp({ content: '❌ เกิดข้อผิดพลาด', ephemeral: true });
+    } else {
+      await interaction.editReply({ content: '❌ เกิดข้อผิดพลาด', ephemeral: true });
+    }
   } catch {}
 }
+
   }
 });
 exportDutyExcel()
