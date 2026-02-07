@@ -1344,11 +1344,6 @@ function exportDutyExcel() {
 
   } catch (err) {
     console.error('INTERACTION ERROR:', err);
-    if (interaction?.deferred) {
-  try {
-    await interaction.editReply({ content: '❌ เกิดข้อผิดพลาด' });
-  } catch {}
-}
   }
 });
 exportDutyExcel()
