@@ -992,7 +992,6 @@ if (interaction.isButton() && interaction.customId === 'export_excel') {
         ลิงก์คดี: `https://discord.com/channels/${interaction.guild.id}/${LOG_CHANNEL_ID}/${c.logMessageId}`
       });
 
-      /* ---------- Count by officer ---------- */
      /* ---------- Count by officer ---------- */
 if (!countByOfficer[officerName]) {
   countByOfficer[officerName] = {
